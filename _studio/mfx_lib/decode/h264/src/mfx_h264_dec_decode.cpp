@@ -1210,7 +1210,6 @@ mfxStatus VideoDECODEH264::DecodeFrameCheck(mfxBitstream *bs, mfxFrameSurface1 *
 #endif // MFX_ENABLE_PROTECT
 
     // MFX_CHECK((bs->DataFlag & MFX_BITSTREAM_COMPLETE_FRAME), MFX_ERR_UNSUPPORTED);
-    m_va->SetBitstream(bs);
 
     try
     {
@@ -1225,6 +1224,12 @@ mfxStatus VideoDECODEH264::DecodeFrameCheck(mfxBitstream *bs, mfxFrameSurface1 *
         if (extbuf)
         {
             ((mfxExtDecodeErrorReport *)extbuf)->ErrorTypes = 0;
+            src.SetExtBuffer(extbuf);
+        }
+
+        extbuf = (bs) ? GetExtendedBuffer(bs->ExtParam, bs->NumExtParam, MFX_EXTBUFF_ENCRYPTION_PARAM) : NULL;
+        if (extbuf)
+        {
             src.SetExtBuffer(extbuf);
         }
 

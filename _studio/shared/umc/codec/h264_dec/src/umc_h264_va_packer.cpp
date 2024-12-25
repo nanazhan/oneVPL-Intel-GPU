@@ -713,108 +713,64 @@ int32_t PackerVA::PackSliceParams(H264Slice *pSlice, int32_t sliceNum, int32_t c
     }
     TRACE_BUFFER_EVENT(VA_TRACE_API_AVC_SLICEPARAMETER_TASK, EVENT_TYPE_INFO, TR_KEY_DECODE_SLICEPARAM,
             pSlice_H264, H264DecodeSliceParam, SLICEPARAM_AVC);
+
+    SetupDecryptDecode(pSlice, &crypto_params_, &encryption_segment_info_, pSlice_H264->slice_data_size);
     return partial_data;
 }
 
-void PackerVA::PackEncryptedParams()
+void PackerVA::SetupDecryptDecode(H264Slice *pSlice, VAEncryptionParameters* crypto_params, std::vector<VAEncryptionSegmentInfo>* segments, mfxU32 nlu_size)
+{
+    mfxExtEncryptionParam* extEncryptionParam = pSlice->GetExtEncryptionParam();
+
+    size_t offset = 0;
+    for (const auto& segment : *segments)
+        offset += segment.segment_length;
+
+    if (extEncryptionParam == NULL) {
+        crypto_params->encryption_type = VA_ENCRYPTION_TYPE_SUBSAMPLE_CTR;
+        VAEncryptionSegmentInfo segment_info = {};
+        segment_info.segment_start_offset = offset;
+        segment_info.segment_length = segment_info.init_byte_length = nlu_size;
+        segments->emplace_back(std::move(segment_info));
+        crypto_params->num_segments++;
+        crypto_params->segment_info = &segments->front();
+        return;
+    }
+
+    m_va->DecryptCTR(extEncryptionParam, crypto_params);
+
+    for (uint32_t i = 0; i < extEncryptionParam->uiNumSegments; i++)
+    {
+        EncryptionSegmentInfo temp_info = extEncryptionParam->pSegmentInfo[i];
+        VAEncryptionSegmentInfo segment_info = {};
+        segment_info.segment_start_offset = offset;
+        segment_info.segment_length = temp_info.clear_bytes + temp_info.encrypted_bytes - 4; // FIXME: hard code
+        segment_info.init_byte_length = temp_info.clear_bytes - 4; // FIXME: hard code
+        segment_info.partial_aes_block_size = 0; //FIXME: see chromium
+        memcpy(segment_info.aes_cbc_iv_or_ctr, temp_info.aes_cbc_iv_or_ctr, 64);
+        offset += temp_info.clear_bytes + temp_info.encrypted_bytes;
+        segments->emplace_back(std::move(segment_info));
+    }
+
+    crypto_params->key_blob_size = 16;
+    crypto_params->encryption_type = extEncryptionParam->encryption_type;
+    crypto_params->num_segments += extEncryptionParam->uiNumSegments;
+    crypto_params->segment_info = &segments->front();
+}
+
+void PackerVA::PackEncryptedParams(VAEncryptionParameters* crypto_params)
 {
     MFX_AUTO_LTRACE(MFX_TRACE_LEVEL_API, "PackerVA::PackEncryptedParams");
-
-    mfxBitstream *bs = m_va->GetBitstream();
-    if (!bs) {
-        MFX_LTRACE_MSG(MFX_TRACE_LEVEL_API, "bs is nullptr");
-        return;
-    }
-
-    if (!bs->EncryptedData) // no encryptedData need to process
-    {
-        MFX_LTRACE_MSG(MFX_TRACE_LEVEL_API, "bs->EncryptedData is nullptr");
-        MFX_LTRACE_MSG(MFX_TRACE_LEVEL_API, "VAEncryptionParameters process");
-        UMCVACompBuffer *buffer;
-        VAEncryptionParameters* p = (VAEncryptionParameters*)m_va->GetCompBuffer(VAEncryptionParameterBufferType, &buffer, sizeof(VAEncryptionParameters));
-        memset(p, 0, sizeof(VAEncryptionParameters));
-        p->encryption_type = VA_ENCRYPTION_TYPE_SUBSAMPLE_CTR;
-        p->segment_info = new VAEncryptionSegmentInfo[1];
-        memset(p->segment_info, 0, sizeof(VAEncryptionSegmentInfo));
-        p->segment_info->segment_start_offset = 0;
-        UMCVACompBuffer* compBuf1;
-        auto pSlice_H264 = (VASliceParameterBufferH264*)m_va->GetCompBuffer(VASliceParameterBufferType, &compBuf1);
-        p->segment_info->segment_length = pSlice_H264->slice_data_size;
-        p->segment_info->init_byte_length = pSlice_H264->slice_data_size;
-        p->num_segments = 1;
-        buffer->SetDataSize(sizeof(VAEncryptionParameters));
-        return;
-    }
 
     // copy mfxExtEncryptionParam to VAEncryptionParameters
     UMCVACompBuffer *encryptionParameterBuffer;
     VAEncryptionParameters* pEncryptionParam = (VAEncryptionParameters*)m_va->GetCompBuffer(VAEncryptionParameterBufferType, &encryptionParameterBuffer, sizeof(VAEncryptionParameters));
     if (!pEncryptionParam)
         MFX_LTRACE_MSG(MFX_TRACE_LEVEL_API, "pEncryptionParam is nullptr");
-    memset(pEncryptionParam, 0, sizeof(VAEncryptionParameters));
+    memcpy(pEncryptionParam, crypto_params, sizeof(VAEncryptionParameters));
+
     encryptionParameterBuffer->SetDataSize(sizeof(VAEncryptionParameters));
 
-    auto extEncryptionParam = reinterpret_cast<mfxExtEncryptionParam*>(GetExtendedBuffer(bs->ExtParam, bs->NumExtParam, MFX_EXTBUFF_ENCRYPTION_PARAM));
-    MFX_TRACE_P(bs->ExtParam);
-    MFX_TRACE_I(bs->NumExtParam);
-    if (!extEncryptionParam)
-        MFX_LTRACE_MSG(MFX_TRACE_LEVEL_API, "extEncryptionParam is nullptr");
-
-    m_va->DecryptCTR(extEncryptionParam, pEncryptionParam);
-/*
-    std::string key_blob_str = FormatHex(pEncryptionParam->wrapped_decrypt_blob, 16);
-    MFX_TRACE_S(key_blob_str.c_str());
-*/
-    pEncryptionParam->key_blob_size = 16;
-    pEncryptionParam->encryption_type = extEncryptionParam->encryption_type;
-    MFX_TRACE_I(pEncryptionParam->encryption_type);
-
-    pEncryptionParam->segment_info = new VAEncryptionSegmentInfo[extEncryptionParam->uiNumSegments];
-    if (!pEncryptionParam->segment_info)
-        throw h264_exception(UMC_ERR_ALLOC);
-
-    for (uint32_t i = 0; i < extEncryptionParam->uiNumSegments; i++)
-    {
-        memcpy(&pEncryptionParam->segment_info[i], &extEncryptionParam->pSegmentInfo[i], sizeof(*pEncryptionParam->segment_info));
-    }
-    pEncryptionParam->num_segments = extEncryptionParam->uiNumSegments;
-
-    // plus the size of clear header for encrypted params
-    UMCVACompBuffer* compBuf;
-    auto pSlice_H264 = (VASliceParameterBufferH264*)m_va->GetCompBuffer(VASliceParameterBufferType, &compBuf);
-    auto header_size = bs->DataLength - bs->EncryptedData->DataLength;
-    for (uint32_t i = 0; i < extEncryptionParam->uiNumSegments; i++)
-    {
-        pEncryptionParam->segment_info[i].segment_length = bs->DataLength - 4; //fixme: hard code
-        pEncryptionParam->segment_info[i].init_byte_length = header_size - 4; // fixme: hard code
-        ALOGD("onevpl iv = %s", FormatHex(pEncryptionParam->segment_info[i].aes_cbc_iv_or_ctr, 16).c_str());
-        ALOGD("segment_info, header_size = %d,  segment_length = %d, init_byte_length = %d",
-            header_size, pEncryptionParam->segment_info[i].segment_length, pEncryptionParam->segment_info[i].init_byte_length);
-    }
-
-    // copy bs->EncryptedData->Data to pProtectedSlice
-/*
-    if (bs->EncryptedData)
-    {
-        MFX_LTRACE_MSG(MFX_TRACE_LEVEL_API, "zyc, EncryptedData exist");
-
-        UMCVACompBuffer* CompBuf;
-        uint8_t *pVAAPI_BitStreamBuffer = (uint8_t*)m_va->GetCompBuffer(VASliceDataBufferType, &CompBuf);
-        if (!pVAAPI_BitStreamBuffer)
-            throw h264_exception(UMC_ERR_FAILED);
-
-        if (CompBuf->GetBufferSize() < bs->EncryptedData->DataLength + CompBuf->GetDataSize()) {
-            MFX_LTRACE_MSG(MFX_TRACE_LEVEL_API, "no enongh buffer to copy encrypted data");
-            MFX_TRACE_I(CompBuf->GetBufferSize());
-            MFX_TRACE_I(bs->EncryptedData->DataLength);
-            MFX_TRACE_I(CompBuf->GetDataSize());
-        } else {
-            MFX_TRACE_I(CompBuf->GetDataSize());
-            memcpy(pVAAPI_BitStreamBuffer + CompBuf->GetDataSize(), bs->EncryptedData->Data + bs->EncryptedData->DataOffset, bs->EncryptedData->DataLength);
-            CompBuf->SetDataSize(bs->EncryptedData->DataLength + CompBuf->GetDataSize());
-        }
-    }
-*/
     MFX_LTRACE_MSG(MFX_TRACE_LEVEL_API, "PackEncryptedParams is done");
     return;
 }
@@ -924,6 +880,8 @@ void PackerVA::PackAU(const H264DecoderFrame *pFrame, int32_t isTop)
 
     for ( ; first_slice < count_all; )
     {
+        encryption_segment_info_.clear();
+        memset(&crypto_params_, 0, sizeof(crypto_params_));
         PackPicParams(sliceInfo, slice);
 
         CreateSliceParamBuffer(sliceInfo);
@@ -957,7 +915,7 @@ void PackerVA::PackAU(const H264DecoderFrame *pFrame, int32_t isTop)
         if (m_va->GetVideoProcessingVA())
             PackProcessingInfo(sliceInfo);
 #endif
-        PackEncryptedParams();
+        PackEncryptedParams(&crypto_params_);
 
         Status sts = m_va->Execute();
         if (sts != UMC_OK)

@@ -58,6 +58,10 @@ H264Slice::H264Slice(MemoryAllocator *pMemoryAllocator)
 H264Slice::~H264Slice()
 {
     Release();
+    if (m_extEncryptionParam) {
+        delete[] m_extEncryptionParam->pSegmentInfo;
+        delete m_extEncryptionParam;
+    }
 
 } // H264Slice::~H264Slice(void)
 

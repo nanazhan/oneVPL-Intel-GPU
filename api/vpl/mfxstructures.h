@@ -5120,22 +5120,11 @@ MFX_PACK_END()
 #endif
 
 typedef struct {
-    /** \brief  The offset relative to the start of the bitstream input in
-     *  bytes of the start of the segment */
-    mfxU32 segment_start_offset;
-    /** \brief  The length of the segments in bytes */
-    mfxU32 segment_length;
-    /** \brief  The length in bytes of the remainder of an incomplete block
-     *  from a previous segment*/
-    mfxU32 partial_aes_block_size;
-    /** \brief  The length in bytes of the initial clear data */
-    mfxU32 init_byte_length;
-    /** \brief  This will be AES counter for secure decode and secure encode
-     *  when numSegments equals 1, valid size is specified by
-     * \c key_blob_size */
+    mfxU32 block_offset;
+    mfxU32 data_length;
+    mfxU32 clear_bytes;
+    mfxU32 encrypted_bytes;
     mfxU8 aes_cbc_iv_or_ctr[64];
-    /** \brief Reserved bytes for future use, must be zero */
-    mfxU32 va_reserved[8];
 } EncryptionSegmentInfo;
 
 typedef struct {

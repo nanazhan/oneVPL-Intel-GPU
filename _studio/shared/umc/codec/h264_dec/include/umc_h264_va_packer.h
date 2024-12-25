@@ -108,7 +108,8 @@ protected:
 
     void FillFrameAsInvalid(VAPictureH264 * pic);
 
-    void PackEncryptedParams();
+    void SetupDecryptDecode(H264Slice *pSlice, VAEncryptionParameters* crypto_params, std::vector<VAEncryptionSegmentInfo>* segments, mfxU32 nlu_size);
+    void PackEncryptedParams(VAEncryptionParameters* crypto_params);
 
 #ifndef MFX_DEC_VIDEO_POSTPROCESS_DISABLE
     void PackProcessingInfo(H264DecoderFrameInfo * sliceInfo);
@@ -127,6 +128,10 @@ protected:
     int32_t PackSliceParams(H264Slice *pSlice, int32_t sliceNum, int32_t chopping, int32_t numSlicesOfPrevField);
 
     void PackQmatrix(const UMC_H264_DECODER::H264ScalingPicParams * scaling);
+
+private:
+    VAEncryptionParameters crypto_params_;
+    std::vector<VAEncryptionSegmentInfo> encryption_segment_info_;
 };
 
 

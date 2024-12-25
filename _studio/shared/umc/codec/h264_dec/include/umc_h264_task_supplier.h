@@ -563,7 +563,7 @@ public:
         return m_Headers.m_SeqParams.GetCurrentHeader();
     }
 
-    virtual H264Slice * DecodeSliceHeader(NalUnit *nalUnit);
+    virtual H264Slice * DecodeSliceHeader(NalUnit *nalUnit, mfxExtEncryptionParam* extEncryptionParam=NULL);
     virtual H264Slice * CreateSlice();
 
     H264_Heap_Objects * GetObjHeap()

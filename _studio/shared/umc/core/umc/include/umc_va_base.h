@@ -262,8 +262,6 @@ public:
 
     virtual bool IsIntelCustomGUID() const = 0;
     virtual int32_t GetSurfaceID(int32_t idx) const { return idx; }
-    virtual mfxBitstream* GetBitstream() { return m_bs; }
-    virtual void SetBitstream(mfxBitstream* bs) { m_bs = bs; }
 
     virtual bool DecryptCTR(mfxExtEncryptionParam* extEncryptionParam, VAEncryptionParameters* pEncryptionParam) = 0;
 

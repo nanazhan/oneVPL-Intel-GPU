@@ -373,12 +373,12 @@ Status VATaskSupplier::AllocateFrameData(H264DecoderFrame * pFrame)
     return UMC_OK;
 }
 
-H264Slice * VATaskSupplier::DecodeSliceHeader(NalUnit *nalUnit)
+H264Slice * VATaskSupplier::DecodeSliceHeader(NalUnit *nalUnit, mfxExtEncryptionParam* extEncryptionParam)
 {
     size_t dataSize = nalUnit->GetDataSize();
     nalUnit->SetDataSize(std::min<size_t>(1024, dataSize));
 
-    H264Slice * slice = TaskSupplier::DecodeSliceHeader(nalUnit);
+    H264Slice * slice = TaskSupplier::DecodeSliceHeader(nalUnit, extEncryptionParam);
 
     nalUnit->SetDataSize(dataSize);
 
