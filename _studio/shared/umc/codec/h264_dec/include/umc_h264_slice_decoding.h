@@ -101,11 +101,11 @@ public:
     // Obtain first MB number
     int32_t GetFirstMBNumber(void) const {return m_iFirstMBFld;}
     int32_t GetStreamFirstMB(void) const {return m_iFirstMB;}
+
     mfxExtDecryptConfig* GetDecryptConfig(void) {return m_decryptConfig;}
     void SetDecryptConfig(mfxExtDecryptConfig* decryptConfig) {
         // FIXME: check if can direct use original pointer and not do deep copy
         if (m_decryptConfig) {
-            delete[] m_decryptConfig->subsamples;
             delete m_decryptConfig;
         }
         if (decryptConfig == NULL) {
@@ -114,14 +114,15 @@ public:
         }
         m_decryptConfig = new mfxExtDecryptConfig;
 
-        m_decryptConfig->encryption_type = decryptConfig->encryption_type;
-        std::memcpy(m_decryptConfig->key_blob, decryptConfig->key_blob, 16);
+        m_decryptConfig->encryption_scheme = decryptConfig->encryption_scheme;
+        std::memcpy(m_decryptConfig->hw_key_id, decryptConfig->hw_key_id, 16);
+        std::memcpy(m_decryptConfig->iv, decryptConfig->iv, 16);
         m_decryptConfig->session = decryptConfig->session;
-        m_decryptConfig->num_subsamples = decryptConfig->num_subsamples;
-
-        m_decryptConfig->subsamples = new SubsampleEntry[decryptConfig->num_subsamples];
-        std::memcpy(m_decryptConfig->subsamples, decryptConfig->subsamples, decryptConfig->num_subsamples * sizeof(SubsampleEntry));
+        m_decryptConfig->num_subsamples = 0;
     }
+    std::vector<SubsampleEntry> GetSubsamples() { return m_subsamples; }
+    void SetSubsamples(std::vector<SubsampleEntry> subsamples) { m_subsamples = subsamples; }
+
     void SetFirstMBNumber(int32_t x) {m_iFirstMB = x;}
     // Obtain MB width
     int32_t GetMBWidth(void) const {return m_iMBWidth;}
@@ -260,6 +261,7 @@ public:  // DEBUG !!!! should remove dependence
 
     H264_Heap_Objects           *m_pObjHeap;
     mfxExtDecryptConfig         *m_decryptConfig = NULL;
+    std::vector<SubsampleEntry> m_subsamples;
 };
 
 inline

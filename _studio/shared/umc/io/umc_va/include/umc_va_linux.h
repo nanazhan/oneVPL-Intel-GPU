@@ -87,8 +87,6 @@ public:
     VAContextID*  m_pContext;
     bool*         m_pKeepVAState;
     int           m_CreateFlags;
-
-    uint32_t encryption_type;
 };
 
 /* LinuxVideoAccelerator -----------------------------------------------------*/
@@ -154,7 +152,7 @@ protected:
     VAProtectedSessionID CreateProtectedSession(uint32_t session_mode,
                                                 uint32_t session_type,
                                                 VAEntrypoint entrypoint,
-                                                uint32_t encryption_type);
+                                                EncryptionScheme encryption_scheme);
     Status AttachProtectedSession(VAProtectedSessionID session_id);
     bool InitKey();
     bool PassThrough(void* input, size_t input_size, void* output, size_t output_size);

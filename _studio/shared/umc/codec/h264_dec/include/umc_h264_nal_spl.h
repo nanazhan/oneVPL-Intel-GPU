@@ -28,10 +28,10 @@
 #include "umc_h264_dec_defs_dec.h"
 #include "umc_media_data_ex.h"
 #include "umc_h264_heap.h"
+#include "mfxstructures.h"
 
 namespace UMC
 {
-
 inline
 bool IsItAllowedCode(int32_t iCode)
 {
@@ -85,6 +85,11 @@ public:
 
     int m_nal_unit_type;
     bool m_use_external_memory;
+
+    void GetCurrentSubsamples(MediaData * pSource);
+    std::vector<SubsampleEntry> GetSubsamples() { return m_subsamples; }
+private:
+    std::vector<SubsampleEntry> m_subsamples;
 };
 
 class SwapperBase

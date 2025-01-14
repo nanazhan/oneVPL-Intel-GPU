@@ -5119,18 +5119,22 @@ typedef struct {
 MFX_PACK_END()
 #endif
 
+enum struct EncryptionScheme {
+  kCenc,  // 'cenc' subsample encryption using AES-CTR mode.
+  kCbcs,  // 'cbcs' pattern encryption using AES-CBC mode.
+  kMaxValue = kCbcs
+};
+
 typedef struct {
-    mfxU32 block_offset; // FIXME: what's the meaning
-    mfxU32 data_length; // FIXME: If necessary
     mfxU32 clear_bytes;
     mfxU32 cypher_bytes;
-    mfxU8 aes_cbc_iv_or_ctr[64]; // FIXME: seperate or only need one, chromium
 } SubsampleEntry;
 
 typedef struct {
     mfxExtBuffer Header;      /*!< Extension buffer header. Header.BufferId must be equal to MFX_EXTBUFF_DECRYPT_CONFIG. */
-    mfxU32 encryption_type;
-    mfxU8 key_blob[16];
+    EncryptionScheme encryption_scheme;
+    mfxU8 hw_key_id[16];
+    mfxU8 iv[16];
     mfxU32 session;
     mfxU32 num_subsamples;
     SubsampleEntry *subsamples;

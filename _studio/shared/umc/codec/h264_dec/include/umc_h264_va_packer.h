@@ -108,7 +108,7 @@ protected:
 
     void FillFrameAsInvalid(VAPictureH264 * pic);
 
-    void SetupDecryptDecode(H264Slice *pSlice, VAEncryptionParameters* crypto_params, std::vector<VAEncryptionSegmentInfo>* segments, mfxU32 nlu_size);
+    void SetupDecryptDecode(H264Slice *pSlice, VAEncryptionParameters* crypto_params, std::vector<VAEncryptionSegmentInfo>* segments);
     void PackEncryptedParams(VAEncryptionParameters* crypto_params);
 
 #ifndef MFX_DEC_VIDEO_POSTPROCESS_DISABLE

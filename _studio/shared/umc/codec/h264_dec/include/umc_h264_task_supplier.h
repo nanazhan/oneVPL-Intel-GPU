@@ -563,7 +563,7 @@ public:
         return m_Headers.m_SeqParams.GetCurrentHeader();
     }
 
-    virtual H264Slice * DecodeSliceHeader(NalUnit *nalUnit, mfxExtDecryptConfig *decryptConfig=NULL);
+    virtual H264Slice * DecodeSliceHeader(NalUnit *nalUnit);
     virtual H264Slice * CreateSlice();
 
     H264_Heap_Objects * GetObjHeap()
@@ -657,6 +657,8 @@ protected:
     Mutex m_mGuard;
 
     bool m_ignoreLevelConstrain;
+
+    mfxExtDecryptConfig *m_decryptConfig=NULL;
 
 private:
     TaskSupplier & operator = (TaskSupplier &)

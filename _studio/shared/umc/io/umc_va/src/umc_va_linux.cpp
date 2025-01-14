@@ -600,7 +600,7 @@ Status LinuxVideoAccelerator::Init(VideoAcceleratorParams* pInfo)
         if (1)
         {
             m_protectedSessionID = CreateProtectedSession(VA_PC_SESSION_MODE_HEAVY,
-                                    VA_PC_SESSION_TYPE_DISPLAY, VAEntrypointProtectedContent, VA_ENCRYPTION_TYPE_SUBSAMPLE_CTR);
+                                    VA_PC_SESSION_TYPE_DISPLAY, VAEntrypointProtectedContent, EncryptionScheme::kCenc);
             umcRes = AttachProtectedSession(m_protectedSessionID);
         }
     }
@@ -644,7 +644,7 @@ Status LinuxVideoAccelerator::SetAttributes(VAProfile va_profile, LinuxVideoAcce
 VAProtectedSessionID LinuxVideoAccelerator::CreateProtectedSession(uint32_t session_mode,
                                                                    uint32_t session_type,
                                                                    VAEntrypoint entrypoint,
-                                                                   uint32_t encryption_type)
+                                                                   EncryptionScheme encryption_scheme)
 {
     MFX_AUTO_LTRACE(MFX_TRACE_LEVEL_HOTSPOTS, "LinuxVideoAccelerator::CreateProtectedSession");
     VAStatus va_status = VA_STATUS_SUCCESS;
@@ -696,12 +696,9 @@ VAProtectedSessionID LinuxVideoAccelerator::CreateProtectedSession(uint32_t sess
     attrib_cp[2].value = VA_PC_CIPHER_AES;
     attrib_cp[3].value = VA_PC_BLOCK_SIZE_128;
     attrib_cp[4].value = VA_PC_CIPHER_MODE_CTR;
-    if (VA_ENCRYPTION_TYPE_FULLSAMPLE_CBC == encryption_type || VA_ENCRYPTION_TYPE_SUBSAMPLE_CBC == encryption_type)
+    if (EncryptionScheme::kCenc == encryption_scheme)
         attrib_cp[4].value = VA_PC_CIPHER_MODE_CBC;
-    if (VA_ENCRYPTION_TYPE_SUBSAMPLE_CBC == encryption_type || VA_ENCRYPTION_TYPE_SUBSAMPLE_CTR == encryption_type)
-        attrib_cp[5].value = VA_PC_SAMPLE_TYPE_SUBSAMPLE;
-    else
-        attrib_cp[5].value = VA_PC_SAMPLE_TYPE_FULLSAMPLE;
+    attrib_cp[5].value = VA_PC_SAMPLE_TYPE_SUBSAMPLE;
     attrib_cp[6].value = VA_PC_USAGE_DEFAULT;
 
     VAConfigID config_id;
@@ -725,43 +722,6 @@ VAProtectedSessionID LinuxVideoAccelerator::CreateProtectedSession(uint32_t sess
     va_status = vaDestroyConfig(m_dpy, config_id);
     if (va_status != VA_STATUS_SUCCESS)
         MFX_TRACE_1("vaDestroyConfig: ", "%d", va_status);
-
-    // typedef struct _intel_oem_policy_t {
-    //     uint8_t pavp_type;
-    //     uint8_t drm_type;
-    //     uint8_t content_type;
-    //     uint8_t version;
-    //     uint32_t pavp_mode;
-    // } intel_oem_policy_t;
-    // auto hw_config = std::make_unique<uint8_t>(16);
-    // *reinterpret_cast<intel_oem_policy_t*>(hw_config.get()) = {
-    //     .pavp_type = 1, // PAVP_SESSION_TYPE_DECODE
-    //     .drm_type = 4, // PAVP_DRM_TYPE_WIDEVINE
-    //     .content_type = 0, // PAVP_SESSION_CONTENT_TYPE_VIDEO
-    //     .version = 1, // PAVP_OEM_POLICY_BLOB_VERSION_V1
-    //     .pavp_mode = 2 // PAVP_SESSION_MODE_HEAVY
-    // };
-
-    // VACompBuffer* compBuf = GetCompBufferHW(VAProtectedSessionExecuteBufferType, sizeof(VAProtectedSessionExecuteBuffer));
-    // VAProtectedSessionExecuteBuffer* hw_update_buf = (VAProtectedSessionExecuteBuffer*)compBuf->GetPtr();
-
-    // std::vector<uint8_t> hw_identifier_out;
-    // constexpr size_t kHwIdentifierMaxSize = 64;
-    // memset(hw_update_buf, 0, sizeof(VAProtectedSessionExecuteBuffer));
-    // hw_update_buf->function_id = VA_TEE_EXEC_TEE_FUNCID_HW_UPDATE;
-    // hw_update_buf->input.data_size = 16; // sizeof(OEMCrypto_PolicyBlobInfo)
-    // hw_update_buf->input.data = static_cast<void*>(hw_config.get());
-    // hw_update_buf->output.max_data_size = kHwIdentifierMaxSize;
-    // hw_identifier_out.resize(kHwIdentifierMaxSize);
-    // hw_update_buf->output.data = hw_identifier_out.data();
-
-    // compBuf->SetDataSize(sizeof(VASliceParameterBufferH264));
-
-    // VABufferID id = compBuf->GetID();
-    // VAStatus va_res = vaProtectedSessionExecute(m_dpy, session, id);
-    // ALOGD("Nana: hw_update res = %d", va_res);
-    
-    // CheckAndDestroyVAbuffer(m_dpy, id);
  
     MFX_CHECK(VA_STATUS_SUCCESS == va_status, VA_INVALID_ID);
 
@@ -885,7 +845,7 @@ bool LinuxVideoAccelerator::PassThrough(void* input, size_t input_size, void* ou
     {
         // create HECI session
         m_heci_sessionID = CreateProtectedSession(VA_PC_SESSION_MODE_NONE, VA_PC_SESSION_TYPE_NONE,
-                                            VAEntrypointProtectedTEEComm, VA_ENCRYPTION_TYPE_SUBSAMPLE_CTR);
+                                            VAEntrypointProtectedTEEComm, EncryptionScheme::kCenc);
         if (m_heci_sessionID == VA_INVALID_ID) {
             MFX_LTRACE_MSG(MFX_TRACE_LEVEL_EXTCALL,"Create HECI session fails");
             return false;
@@ -1021,7 +981,7 @@ bool LinuxVideoAccelerator::DecryptCTR(mfxExtDecryptConfig* decryptConfig, VAEnc
     if (VA_INVALID_ID == m_protectedSessionID)
     {
         m_protectedSessionID = CreateProtectedSession(VA_PC_SESSION_MODE_HEAVY,
-                                VA_PC_SESSION_TYPE_DISPLAY, VAEntrypointProtectedContent, decryptConfig->encryption_type);
+                                VA_PC_SESSION_TYPE_DISPLAY, VAEntrypointProtectedContent, decryptConfig->encryption_scheme);
         Status umcRes = AttachProtectedSession(m_protectedSessionID);
         if (UMC_OK != umcRes) {
             MFX_LTRACE_MSG(MFX_TRACE_LEVEL_EXTCALL, "AttachProtectedSession failed!");
@@ -1031,11 +991,11 @@ bool LinuxVideoAccelerator::DecryptCTR(mfxExtDecryptConfig* decryptConfig, VAEnc
     }
 
     m_key_session = decryptConfig->session;
-    MFX_TRACE_1("selectKey from c2 = ", "%s", FormatHex(decryptConfig->key_blob, 16).c_str());
-    if (memcmp(m_selectKey.data(), decryptConfig->key_blob, 16) != 0)
+    MFX_TRACE_1("selectKey from c2 = ", "%s", FormatHex(decryptConfig->hw_key_id, 16).c_str());
+    if (memcmp(m_selectKey.data(), decryptConfig->hw_key_id, 16) != 0)
     {
         MFX_LTRACE_MSG(MFX_TRACE_LEVEL_EXTCALL, "select changed, need to update");
-        std::copy(decryptConfig->key_blob, decryptConfig->key_blob + 16, m_selectKey.data());
+        std::copy(decryptConfig->hw_key_id, decryptConfig->hw_key_id + 16, m_selectKey.data());
         m_key_blob.second = false;
     }
 

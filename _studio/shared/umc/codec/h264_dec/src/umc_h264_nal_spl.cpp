@@ -30,6 +30,35 @@
 
 namespace UMC
 {
+static std::vector<SubsampleEntry> EncryptedRangesToSubsampleEntry(
+    const uint8_t* start,
+    const uint8_t* end,
+    const Ranges<const uint8_t*>& encrypted_ranges)
+{
+    std::vector<SubsampleEntry> subsamples(encrypted_ranges.size());
+    const uint8_t* cur = start;
+    for (size_t i = 0; i < encrypted_ranges.size(); ++i) {
+        const uint8_t* encrypted_start = encrypted_ranges.start(i);
+        if (encrypted_start < cur)
+            MFX_LOG_ERROR("Encrypted range started before the current buffer pointer.\n");
+        subsamples[i].clear_bytes = encrypted_start - cur;
+        const uint8_t* encrypted_end = encrypted_ranges.end(i);
+        subsamples[i].cypher_bytes = encrypted_end - encrypted_start;
+        cur = encrypted_end;
+        if (cur > end)
+            MFX_LOG_ERROR("Encrypted range is outside the buffer range.\n");
+    }
+    // If there is more data in the buffer but not covered by encrypted_ranges,
+    // then it must be in the clear.
+    if (cur < end) {
+        SubsampleEntry entry;
+        entry.clear_bytes = end - cur;
+        entry.cypher_bytes = 0;
+        subsamples.push_back(std::move(entry));
+    }
+    return subsamples;
+}
+
 void SwapMemoryAndRemovePreventingBytes(void *pDestination, size_t &nDstSize, void *pSource, size_t nSrcSize);
 
 static int32_t FindStartCode(uint8_t * (&pb), size_t &nSize)
@@ -151,8 +180,8 @@ public:
             return -1;
 
         int32_t startCodeSize;
-
-        int32_t iCodeNext = FindStartCode(source, size, startCodeSize);
+        Ranges<const uint8_t*> encryptedRanges = pSource->GetEncryptedRanges();
+        int32_t iCodeNext = FindStartCodeInClearRanges(source, size, startCodeSize, encryptedRanges);
 
         if (m_prev.size())
         {
@@ -198,7 +227,7 @@ public:
         pSource->MoveDataPointer((int32_t)(source - (uint8_t *)pSource->GetDataPointer() - startCodeSize));
 
         int32_t startCodeSize1;
-        iCodeNext = FindStartCode(source, size, startCodeSize1);
+        iCodeNext = FindStartCodeInClearRanges(source, size, startCodeSize1, encryptedRanges);
 
         pSource->MoveDataPointer(startCodeSize);
 
@@ -279,6 +308,44 @@ private:
     std::vector<uint8_t>  m_prev;
     int32_t   m_code;
     double   m_pts;
+
+    int32_t FindStartCodeInClearRanges(uint8_t * (&pb), size_t & size, int32_t & startCodeSize, const Ranges<const uint8_t*>& encryptedRanges)
+    {
+        if (encryptedRanges.size() == 0)
+            return FindStartCode(pb, size, startCodeSize);
+        uint8_t* pbEnd = pb + size;
+        int32_t iCodeNext = -1;
+        uint8_t* start = pb;
+        int32_t startCodeSize1;
+        size_t bytesLeft;
+        do {
+            bytesLeft = size - (start - pb);
+            iCodeNext = FindStartCode(start, bytesLeft, startCodeSize1);
+            if (iCodeNext == -1) {
+                pb = start;
+                size = bytesLeft;
+                startCodeSize = startCodeSize1;
+                return -1;
+            }
+            const uint8_t* startCode = start - startCodeSize1;
+            const uint8_t* startCodeEnd = start;
+            Ranges<const uint8_t*> startCodeRange;
+            startCodeRange.Add(startCode, startCodeEnd + 1);
+
+            if (encryptedRanges.IntersectionWith(startCodeRange).size() > 0) {
+                // The start code is inside an encrypted section so we need to scan
+                // for another start code.
+                startCodeSize1 = 0;
+                start = std::min(start - startCodeSize1 + 1, pbEnd);
+            }
+
+        } while (startCodeSize1 == 0);
+
+        pb = start;
+        size = bytesLeft;
+        startCodeSize = startCodeSize1;
+        return iCodeNext;
+    }
 
     int32_t FindStartCode(uint8_t * (&pb), size_t & size, int32_t & startCodeSize)
     {
@@ -391,6 +458,15 @@ public:
     }
 };
 
+void NalUnit::GetCurrentSubsamples(MediaData *pSource)
+{
+    Ranges<const uint8_t*> naluRange;
+    Ranges<const uint8_t*> encryptedRanges = pSource->GetEncryptedRanges();
+    naluRange.Add((const uint8_t*)GetDataPointer(), (const uint8_t*)GetDataPointer() + GetDataSize());
+    auto intersection = encryptedRanges.IntersectionWith(naluRange);
+    m_subsamples =  EncryptedRangesToSubsampleEntry(naluRange.start(0), naluRange.end(0), intersection);
+}
+
 NALUnitSplitter::NALUnitSplitter()
     : m_pSwapper(0)
     , m_pStartCodeIter(0)
@@ -447,6 +523,7 @@ NalUnit * NALUnitSplitter::GetNalUnits(MediaData * pSource)
         return 0;
     }
 
+    m_nalUnit.GetCurrentSubsamples(pSource);
     m_nalUnit.m_nal_unit_type = iCode;
 
     /*static int k = 0;

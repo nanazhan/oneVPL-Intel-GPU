@@ -1163,11 +1163,6 @@ mfxStatus VAAPIVideoCORE_T<Base>::CreateVideoAccelerator(
 
     params.m_protectedVA      = param->Protected;
 
-    auto decryptConfig = reinterpret_cast<mfxExtDecryptConfig*>(GetExtendedBuffer(param->ExtParam, param->NumExtParam, MFX_EXTBUFF_DECRYPT_CONFIG));
-    if (decryptConfig) {
-        params.encryption_type = static_cast<VAProtectedSessionID>(decryptConfig->encryption_type);
-    }
-
 #ifndef MFX_DEC_VIDEO_POSTPROCESS_DISABLE
     /* There are following conditions for post processing via HW fixed function engine:
      * (1): AVC
