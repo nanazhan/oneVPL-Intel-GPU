@@ -137,7 +137,7 @@ public:
     Status ExecuteExtension(int, ExtensionData const&) override
     { return UMC_ERR_UNSUPPORTED; }
 
-    bool DecryptCTR(mfxExtEncryptionParam* extEncryptionParam, VAEncryptionParameters* pEncryptionParam);
+    bool DecryptCTR(mfxExtDecryptConfig* , VAEncryptionParameters*);
 
 protected:
 

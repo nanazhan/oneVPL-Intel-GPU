@@ -88,7 +88,7 @@ protected:
 
     virtual H264DecoderFrame * GetFreeFrame(const H264Slice *pSlice = NULL);
 
-    virtual H264Slice * DecodeSliceHeader(NalUnit *nalUnit, mfxExtEncryptionParam* extEncryptionParam = NULL);
+    virtual H264Slice * DecodeSliceHeader(NalUnit *nalUnit, mfxExtDecryptConfig* decryptConfig = NULL);
 
     virtual H264DecoderFrame *GetFrameToDisplayInternal(bool force);
 

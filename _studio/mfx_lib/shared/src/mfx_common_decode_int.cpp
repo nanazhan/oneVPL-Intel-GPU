@@ -72,6 +72,14 @@ void MFXMediaDataAdapter::SetExtBuffer(mfxExtBuffer* extbuf)
         SetAuxInfo(extbuf, extbuf->BufferSz, extbuf->BufferId);
 }
 
+void MFXMediaDataAdapter::SetEncryptedStream(mfxExtBuffer* extbuf)
+{
+    if (extbuf)
+    {
+        SetAuxInfo(extbuf, extbuf->BufferSz, extbuf->BufferId);
+    }
+}
+
 mfxStatus ConvertUMCStatusToMfx(UMC::Status status)
 {
     switch((UMC::eUMC_VA_Status)status)

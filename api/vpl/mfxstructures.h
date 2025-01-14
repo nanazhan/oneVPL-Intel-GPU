@@ -2398,7 +2398,7 @@ enum {
     MFX_EXTBUFF_VPP_AI_SUPER_RESOLUTION = MFX_MAKEFOURCC('V','A','S','R'),
 #endif
 
-    MFX_EXTBUFF_ENCRYPTION_PARAM        = MFX_MAKEFOURCC('E', 'N', 'C', 'R'),
+    MFX_EXTBUFF_DECRYPT_CONFIG          = MFX_MAKEFOURCC('D', 'E', 'C', 'R'),
 };
 
 /* VPP Conf: Do not use certain algorithms  */
@@ -5120,21 +5120,21 @@ MFX_PACK_END()
 #endif
 
 typedef struct {
-    mfxU32 block_offset;
-    mfxU32 data_length;
+    mfxU32 block_offset; // FIXME: what's the meaning
+    mfxU32 data_length; // FIXME: If necessary
     mfxU32 clear_bytes;
-    mfxU32 encrypted_bytes;
-    mfxU8 aes_cbc_iv_or_ctr[64];
-} EncryptionSegmentInfo;
+    mfxU32 cypher_bytes;
+    mfxU8 aes_cbc_iv_or_ctr[64]; // FIXME: seperate or only need one, chromium
+} SubsampleEntry;
 
 typedef struct {
-    mfxExtBuffer Header;      /*!< Extension buffer header. Header.BufferId must be equal to MFX_EXTBUFF_ENCRYPTION_PARAM. */
+    mfxExtBuffer Header;      /*!< Extension buffer header. Header.BufferId must be equal to MFX_EXTBUFF_DECRYPT_CONFIG. */
     mfxU32 encryption_type;
     mfxU8 key_blob[16];
     mfxU32 session;
-    mfxU32 uiNumSegments;
-    EncryptionSegmentInfo *pSegmentInfo;
-} mfxExtEncryptionParam;
+    mfxU32 num_subsamples;
+    SubsampleEntry *subsamples;
+} mfxExtDecryptConfig;
 
 #ifdef __cplusplus
 } // extern "C"

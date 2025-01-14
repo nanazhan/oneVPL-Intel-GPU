@@ -720,13 +720,13 @@ int32_t PackerVA::PackSliceParams(H264Slice *pSlice, int32_t sliceNum, int32_t c
 
 void PackerVA::SetupDecryptDecode(H264Slice *pSlice, VAEncryptionParameters* crypto_params, std::vector<VAEncryptionSegmentInfo>* segments, mfxU32 nlu_size)
 {
-    mfxExtEncryptionParam* extEncryptionParam = pSlice->GetExtEncryptionParam();
+    mfxExtDecryptConfig* decryptConfig = pSlice->GetDecryptConfig();
 
     size_t offset = 0;
     for (const auto& segment : *segments)
         offset += segment.segment_length;
 
-    if (extEncryptionParam == NULL) {
+    if (decryptConfig == NULL) {
         crypto_params->encryption_type = VA_ENCRYPTION_TYPE_SUBSAMPLE_CTR;
         VAEncryptionSegmentInfo segment_info = {};
         segment_info.segment_start_offset = offset;
@@ -737,24 +737,24 @@ void PackerVA::SetupDecryptDecode(H264Slice *pSlice, VAEncryptionParameters* cry
         return;
     }
 
-    m_va->DecryptCTR(extEncryptionParam, crypto_params);
+    m_va->DecryptCTR(decryptConfig, crypto_params);
 
-    for (uint32_t i = 0; i < extEncryptionParam->uiNumSegments; i++)
+    for (uint32_t i = 0; i < decryptConfig->num_subsamples; i++)
     {
-        EncryptionSegmentInfo temp_info = extEncryptionParam->pSegmentInfo[i];
+        SubsampleEntry temp_info = decryptConfig->subsamples[i];
         VAEncryptionSegmentInfo segment_info = {};
         segment_info.segment_start_offset = offset;
-        segment_info.segment_length = temp_info.clear_bytes + temp_info.encrypted_bytes - 4; // FIXME: hard code
+        segment_info.segment_length = temp_info.clear_bytes + temp_info.cypher_bytes - 4; // FIXME: hard code
         segment_info.init_byte_length = temp_info.clear_bytes - 4; // FIXME: hard code
         segment_info.partial_aes_block_size = 0; //FIXME: see chromium
         memcpy(segment_info.aes_cbc_iv_or_ctr, temp_info.aes_cbc_iv_or_ctr, 64);
-        offset += temp_info.clear_bytes + temp_info.encrypted_bytes;
+        offset += temp_info.clear_bytes + temp_info.cypher_bytes;
         segments->emplace_back(std::move(segment_info));
     }
 
     crypto_params->key_blob_size = 16;
-    crypto_params->encryption_type = extEncryptionParam->encryption_type;
-    crypto_params->num_segments += extEncryptionParam->uiNumSegments;
+    crypto_params->encryption_type = decryptConfig->encryption_type;
+    crypto_params->num_segments += decryptConfig->num_subsamples;
     crypto_params->segment_info = &segments->front();
 }
 

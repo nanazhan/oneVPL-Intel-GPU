@@ -1227,10 +1227,10 @@ mfxStatus VideoDECODEH264::DecodeFrameCheck(mfxBitstream *bs, mfxFrameSurface1 *
             src.SetExtBuffer(extbuf);
         }
 
-        extbuf = (bs) ? GetExtendedBuffer(bs->ExtParam, bs->NumExtParam, MFX_EXTBUFF_ENCRYPTION_PARAM) : NULL;
+        extbuf = (bs) ? GetExtendedBuffer(bs->ExtParam, bs->NumExtParam, MFX_EXTBUFF_DECRYPT_CONFIG) : NULL;
         if (extbuf)
         {
-            src.SetExtBuffer(extbuf);
+            src.SetEncryptedStream(extbuf);
         }
 
         for (;;)

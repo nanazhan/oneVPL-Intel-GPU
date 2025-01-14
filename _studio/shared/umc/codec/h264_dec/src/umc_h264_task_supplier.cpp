@@ -3270,13 +3270,13 @@ Status TaskSupplier::AddOneFrame(MediaData * pSource)
             return sts;
     }
 
+    MediaData::AuxInfo* decryptAux = (pSource) ? pSource->GetAuxInfo(MFX_EXTBUFF_DECRYPT_CONFIG) : NULL;
+    mfxExtDecryptConfig* decryptConfig = (decryptAux) ? reinterpret_cast<mfxExtDecryptConfig*>(decryptAux->ptr) : NULL;
+
     do
     {
         MediaData::AuxInfo* aux = (pSource) ? pSource->GetAuxInfo(MFX_EXTBUFF_DECODE_ERROR_REPORT) : NULL;
         mfxExtDecodeErrorReport* pDecodeErrorReport = (aux) ? reinterpret_cast<mfxExtDecodeErrorReport*>(aux->ptr) : NULL;
-
-        aux = (pSource) ? pSource->GetAuxInfo(MFX_EXTBUFF_ENCRYPTION_PARAM) : NULL;
-        mfxExtEncryptionParam* pExtEncryptionParam = (aux) ? reinterpret_cast<mfxExtEncryptionParam*>(aux->ptr) : NULL;
 
         NalUnit *nalUnit = m_pNALSplitter->GetNalUnits(pSource);
 
@@ -3314,7 +3314,7 @@ Status TaskSupplier::AddOneFrame(MediaData * pSource)
         case NAL_UT_AUXILIARY:
         case NAL_UT_CODED_SLICE_EXTENSION:
             {
-            H264Slice * pSlice = DecodeSliceHeader(nalUnit, pExtEncryptionParam);
+            H264Slice * pSlice = DecodeSliceHeader(nalUnit, decryptConfig);
             if (pSlice)
             {
                 umsRes = AddSlice(pSlice, !pSource);
@@ -3332,8 +3332,8 @@ Status TaskSupplier::AddOneFrame(MediaData * pSource)
         case NAL_UT_SPS_EX:
         case NAL_UT_SUBSET_SPS:
         case NAL_UT_PREFIX:
-            if (pExtEncryptionParam) {
-                pExtEncryptionParam->pSegmentInfo[0].clear_bytes -= (nalSize + 4);
+            if (decryptConfig) {
+                decryptConfig->subsamples[0].clear_bytes -= (nalSize + 4);
             }
             umsRes = DecodeHeaders(nalUnit);
             if (umsRes != UMC_OK)
@@ -3431,7 +3431,7 @@ H264Slice * TaskSupplier::CreateSlice()
     return m_ObjHeap.AllocateObject<H264Slice>();
 }
 
-H264Slice * TaskSupplier::DecodeSliceHeader(NalUnit *nalUnit, mfxExtEncryptionParam* extEncryptionParam)
+H264Slice * TaskSupplier::DecodeSliceHeader(NalUnit *nalUnit, mfxExtDecryptConfig *decryptConfig)
 {
     if ((0 > m_Headers.m_SeqParams.GetCurrentID()) ||
         (0 > m_Headers.m_PicParams.GetCurrentID()))
@@ -3455,7 +3455,7 @@ H264Slice * TaskSupplier::DecodeSliceHeader(NalUnit *nalUnit, mfxExtEncryptionPa
     }
     pSlice->SetHeap(&m_ObjHeap);
     pSlice->IncrementReference();
-    pSlice->SetExtEncryptionParam(extEncryptionParam);
+    pSlice->SetDecryptConfig(decryptConfig);
 
     notifier0<H264Slice> memory_leak_preventing_slice(pSlice, &H264Slice::DecrementReference);
 

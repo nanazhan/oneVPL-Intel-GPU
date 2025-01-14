@@ -263,7 +263,7 @@ public:
     virtual bool IsIntelCustomGUID() const = 0;
     virtual int32_t GetSurfaceID(int32_t idx) const { return idx; }
 
-    virtual bool DecryptCTR(mfxExtEncryptionParam* extEncryptionParam, VAEncryptionParameters* pEncryptionParam) = 0;
+    virtual bool DecryptCTR(mfxExtDecryptConfig* decryptConfig, VAEncryptionParameters* pEncryptionParam) = 0;
 
 #if defined(MFX_ENABLE_PROTECT)
     virtual ProtectedVA * GetProtectedVA() { return m_protectedVA.get(); }

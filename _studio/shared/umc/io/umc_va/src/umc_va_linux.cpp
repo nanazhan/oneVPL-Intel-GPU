@@ -1016,12 +1016,12 @@ bool LinuxVideoAccelerator::SetStreamKey()
     return true;
 }
 
-bool LinuxVideoAccelerator::DecryptCTR(mfxExtEncryptionParam* extEncryptionParam, VAEncryptionParameters* pEncryptionParam)
+bool LinuxVideoAccelerator::DecryptCTR(mfxExtDecryptConfig* decryptConfig, VAEncryptionParameters* pEncryptionParam)
 {
     if (VA_INVALID_ID == m_protectedSessionID)
     {
         m_protectedSessionID = CreateProtectedSession(VA_PC_SESSION_MODE_HEAVY,
-                                VA_PC_SESSION_TYPE_DISPLAY, VAEntrypointProtectedContent, extEncryptionParam->encryption_type);
+                                VA_PC_SESSION_TYPE_DISPLAY, VAEntrypointProtectedContent, decryptConfig->encryption_type);
         Status umcRes = AttachProtectedSession(m_protectedSessionID);
         if (UMC_OK != umcRes) {
             MFX_LTRACE_MSG(MFX_TRACE_LEVEL_EXTCALL, "AttachProtectedSession failed!");
@@ -1030,12 +1030,12 @@ bool LinuxVideoAccelerator::DecryptCTR(mfxExtEncryptionParam* extEncryptionParam
         }
     }
 
-    m_key_session = extEncryptionParam->session;
-    MFX_TRACE_1("selectKey from c2 = ", "%s", FormatHex(extEncryptionParam->key_blob, 16).c_str());
-    if (memcmp(m_selectKey.data(), extEncryptionParam->key_blob, 16) != 0)
+    m_key_session = decryptConfig->session;
+    MFX_TRACE_1("selectKey from c2 = ", "%s", FormatHex(decryptConfig->key_blob, 16).c_str());
+    if (memcmp(m_selectKey.data(), decryptConfig->key_blob, 16) != 0)
     {
         MFX_LTRACE_MSG(MFX_TRACE_LEVEL_EXTCALL, "select changed, need to update");
-        std::copy(extEncryptionParam->key_blob, extEncryptionParam->key_blob + 16, m_selectKey.data());
+        std::copy(decryptConfig->key_blob, decryptConfig->key_blob + 16, m_selectKey.data());
         m_key_blob.second = false;
     }
 

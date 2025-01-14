@@ -101,27 +101,26 @@ public:
     // Obtain first MB number
     int32_t GetFirstMBNumber(void) const {return m_iFirstMBFld;}
     int32_t GetStreamFirstMB(void) const {return m_iFirstMB;}
-    mfxExtEncryptionParam* GetExtEncryptionParam(void) {return m_extEncryptionParam;}
-    void SetExtEncryptionParam(mfxExtEncryptionParam* extEncryptionParam) {
+    mfxExtDecryptConfig* GetDecryptConfig(void) {return m_decryptConfig;}
+    void SetDecryptConfig(mfxExtDecryptConfig* decryptConfig) {
         // FIXME: check if can direct use original pointer and not do deep copy
-        if (m_extEncryptionParam) {
-            delete[] m_extEncryptionParam->pSegmentInfo;
-            delete m_extEncryptionParam;
+        if (m_decryptConfig) {
+            delete[] m_decryptConfig->subsamples;
+            delete m_decryptConfig;
         }
-        if (extEncryptionParam == NULL) {
-            m_extEncryptionParam = NULL;
+        if (decryptConfig == NULL) {
+            m_decryptConfig = NULL;
             return;
         }
-        m_extEncryptionParam = new mfxExtEncryptionParam;
+        m_decryptConfig = new mfxExtDecryptConfig;
 
-        m_extEncryptionParam->Header = extEncryptionParam->Header;
-        m_extEncryptionParam->encryption_type = extEncryptionParam->encryption_type;
-        std::memcpy(m_extEncryptionParam->key_blob, extEncryptionParam->key_blob, 16);
-        m_extEncryptionParam->session = extEncryptionParam->session;
-        m_extEncryptionParam->uiNumSegments = extEncryptionParam->uiNumSegments;
+        m_decryptConfig->encryption_type = decryptConfig->encryption_type;
+        std::memcpy(m_decryptConfig->key_blob, decryptConfig->key_blob, 16);
+        m_decryptConfig->session = decryptConfig->session;
+        m_decryptConfig->num_subsamples = decryptConfig->num_subsamples;
 
-        m_extEncryptionParam->pSegmentInfo = new EncryptionSegmentInfo[extEncryptionParam->uiNumSegments];
-        std::memcpy(m_extEncryptionParam->pSegmentInfo, extEncryptionParam->pSegmentInfo, extEncryptionParam->uiNumSegments * sizeof(EncryptionSegmentInfo));
+        m_decryptConfig->subsamples = new SubsampleEntry[decryptConfig->num_subsamples];
+        std::memcpy(m_decryptConfig->subsamples, decryptConfig->subsamples, decryptConfig->num_subsamples * sizeof(SubsampleEntry));
     }
     void SetFirstMBNumber(int32_t x) {m_iFirstMB = x;}
     // Obtain MB width
@@ -260,7 +259,7 @@ public:  // DEBUG !!!! should remove dependence
     MemoryAllocator *m_pMemoryAllocator;                        // (MemoryAllocator *) pointer to memory allocation tool
 
     H264_Heap_Objects           *m_pObjHeap;
-    mfxExtEncryptionParam       *m_extEncryptionParam = NULL;
+    mfxExtDecryptConfig         *m_decryptConfig = NULL;
 };
 
 inline
