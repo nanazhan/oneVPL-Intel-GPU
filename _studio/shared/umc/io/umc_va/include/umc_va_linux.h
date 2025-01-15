@@ -156,7 +156,6 @@ protected:
     Status AttachProtectedSession(VAProtectedSessionID session_id);
     bool InitKey();
     bool PassThrough(void* input, size_t input_size, void* output, size_t output_size);
-    bool SelectKey();
     bool SetStreamKey();
 
 protected:

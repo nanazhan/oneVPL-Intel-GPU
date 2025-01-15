@@ -32,6 +32,7 @@
 
 namespace UMC
 {
+
 inline
 bool IsItAllowedCode(int32_t iCode)
 {

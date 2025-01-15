@@ -766,7 +766,7 @@ bool LinuxVideoAccelerator::InitKey()
         MFX_TRACE_1("vaCreateBuffer() failed va_sts = ", "%d", va_status);
         return false;
     }
-    ALOGD("zyc, vaProtectedSessionExecute + line: %d", __LINE__);
+
     va_status = vaProtectedSessionExecute(m_dpy, m_protectedSessionID, buffer);
     vaDestroyBuffer(m_dpy, buffer);
     if (va_status) {
@@ -882,54 +882,6 @@ bool LinuxVideoAccelerator::PassThrough(void* input, size_t input_size, void* ou
     return true;
 }
 
-bool LinuxVideoAccelerator::SelectKey()
-{
-    MFX_AUTO_LTRACE(MFX_TRACE_LEVEL_EXTCALL, "LinuxVideoAccelerator::SelectKey");
-    // Get a session id
-    constexpr uint32_t wv20_open_session = 0x00C20003;
-    struct wv20_open_session_in {
-        pavp_cmd_header_t header;
-    };
-    struct wv20_open_session_out {
-        pavp_cmd_header_t header;
-        uint32_t session_id;
-    };
-    if (m_key_session < 0)
-    {
-        wv20_open_session_in open_session_in {};
-        wv20_open_session_out open_session_out {};
-        open_session_in.header.command_id = wv20_open_session;
-        open_session_in.header.status = 0;
-        open_session_in.header.buffer_len = sizeof(wv20_open_session_in) - sizeof(pavp_cmd_header_t);
-        if (!PassThrough(&open_session_in, sizeof(wv20_open_session_in), &open_session_out, sizeof(wv20_open_session_out)))
-        {
-            MFX_LTRACE_MSG(MFX_TRACE_LEVEL_HOTSPOTS, "PassThrough failed!");
-            return false;
-        }
-        MFX_TRACE_1("Got session id = ", "%d", open_session_out.session_id);
-        m_key_session = open_session_out.session_id;
-    }
-    size_t input_size = m_selectKey.size() + sizeof(wv20_select_key_in);
-    auto pCmd_in = std::make_unique<uint8_t[]>(m_selectKey.size() + sizeof(wv20_select_key_in));
-    auto select_key_in = reinterpret_cast<wv20_select_key_in*>(pCmd_in.get());
-    select_key_in->session_id = m_key_session;
-    select_key_in->header.api_version = FIRMWARE_API_VERSION_2_1;
-    select_key_in->header.command_id = wv20_select_key; // command id
-    select_key_in->header.buffer_len = input_size - sizeof(pavp_cmd_header_t);
-    select_key_in->key_id_size = m_selectKey.size();
-    memcpy(select_key_in->key_id, m_selectKey.data(), m_selectKey.size());
-    wv20_select_key_out select_key_out{};
-    ALOGD("zyc, select key pass +");
-    if (!PassThrough(select_key_in, input_size, &select_key_out, sizeof(wv20_select_key_out)))
-    {
-        MFX_LTRACE_MSG(MFX_TRACE_LEVEL_HOTSPOTS, "PassThrough failed!");
-        return false;
-    }
-    ALOGD("zyc, select key pass -");
-    m_key_blob.second = false;
-    return true;
-}
-
 bool LinuxVideoAccelerator::SetStreamKey()
 {
     MFX_AUTO_LTRACE(MFX_TRACE_LEVEL_HOTSPOTS, "LinuxVideoAccelerator::SetStreamKey");
@@ -966,7 +918,7 @@ bool LinuxVideoAccelerator::SetStreamKey()
         MFX_TRACE_1("FATAL:SetStreamKey: CreateBuffer fail ", "%d", va_status);
         return false;
     }
-    ALOGD("zyc, vaProtectedSessionExecute + line: %d", __LINE__);
+
     va_status = vaProtectedSessionExecute(m_dpy, m_protectedSessionID, buffer);
     vaDestroyBuffer(m_dpy, buffer);
     if (va_status) {
