@@ -58,7 +58,9 @@ H264Slice::H264Slice(MemoryAllocator *pMemoryAllocator)
 H264Slice::~H264Slice()
 {
     Release();
-
+    if (m_decryptConfig) {
+        delete m_decryptConfig;
+    }
 } // H264Slice::~H264Slice(void)
 
 void H264Slice::Reset()

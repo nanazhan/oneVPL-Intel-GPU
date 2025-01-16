@@ -101,6 +101,28 @@ public:
     // Obtain first MB number
     int32_t GetFirstMBNumber(void) const {return m_iFirstMBFld;}
     int32_t GetStreamFirstMB(void) const {return m_iFirstMB;}
+
+    mfxExtDecryptConfig* GetDecryptConfig(void) {return m_decryptConfig;}
+    void SetDecryptConfig(mfxExtDecryptConfig* decryptConfig) {
+        // FIXME: check if can direct use original pointer and not do deep copy
+        if (m_decryptConfig) {
+            delete m_decryptConfig;
+        }
+        if (decryptConfig == NULL) {
+            m_decryptConfig = NULL;
+            return;
+        }
+        m_decryptConfig = new mfxExtDecryptConfig;
+
+        m_decryptConfig->encryption_scheme = decryptConfig->encryption_scheme;
+        std::memcpy(m_decryptConfig->hw_key_id, decryptConfig->hw_key_id, 16);
+        std::memcpy(m_decryptConfig->iv, decryptConfig->iv, 16);
+        m_decryptConfig->session = decryptConfig->session;
+        m_decryptConfig->num_subsamples = 0;
+    }
+    std::vector<SubsampleEntry> GetSubsamples() { return m_subsamples; }
+    void SetSubsamples(std::vector<SubsampleEntry> subsamples) { m_subsamples = subsamples; }
+
     void SetFirstMBNumber(int32_t x) {m_iFirstMB = x;}
     // Obtain MB width
     int32_t GetMBWidth(void) const {return m_iMBWidth;}
@@ -238,6 +260,8 @@ public:  // DEBUG !!!! should remove dependence
     MemoryAllocator *m_pMemoryAllocator;                        // (MemoryAllocator *) pointer to memory allocation tool
 
     H264_Heap_Objects           *m_pObjHeap;
+    mfxExtDecryptConfig         *m_decryptConfig = NULL;
+    std::vector<SubsampleEntry> m_subsamples;
 };
 
 inline
