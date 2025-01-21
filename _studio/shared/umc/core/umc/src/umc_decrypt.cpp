@@ -61,4 +61,15 @@ std::vector<SubsampleEntry> EncryptedRangesToSubsampleEntry(
     return subsamples;
 }
 
+std::vector<SubsampleEntry> GetCurrentSubsamples(MediaData *pSource, const uint8_t* start, const uint8_t* end)
+{
+    Ranges<const uint8_t*> currentRange;
+    if (start >= end)
+        return {};
+    currentRange.Add(start, end);
+    Ranges<const uint8_t*> encryptedRanges = pSource->GetEncryptedRanges();
+    auto intersection = encryptedRanges.IntersectionWith(currentRange);
+    return EncryptedRangesToSubsampleEntry(currentRange.start(0), currentRange.end(0), intersection);
+}
+
 } // namespace UMC

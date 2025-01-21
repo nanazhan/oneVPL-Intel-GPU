@@ -87,7 +87,7 @@ public:
     int m_nal_unit_type;
     bool m_use_external_memory;
 
-    void GetCurrentSubsamples(MediaData *pSource);
+    void SetSubsamples(MediaData *pSource, const std::vector<SubsampleEntry>& subsamples);
     mfxExtDecryptConfig* DecryptConfig() { return m_decryptConfig; }
     std::vector<SubsampleEntry> Subsamples() { return m_subsamples; }
 private:

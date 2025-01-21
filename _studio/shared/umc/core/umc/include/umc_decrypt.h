@@ -23,6 +23,7 @@
 
 #include <vector>
 #include "umc_ranges.h"
+#include "umc_media_data.h"
 #include "mfxstructures.h"
 
 namespace UMC {
@@ -31,10 +32,7 @@ const int kDecryptionKeySize = 16;
 
 void ctr128_inc64(uint8_t* counter);
 
-std::vector<SubsampleEntry> EncryptedRangesToSubsampleEntry(
-    const uint8_t* start,
-    const uint8_t* end,
-    const Ranges<const uint8_t*>& encrypted_ranges);
+std::vector<SubsampleEntry> GetCurrentSubsamples(MediaData *pSource, const uint8_t* start, const uint8_t* end);
 
 union pavp_header_stream_t {
     uint32_t dw;

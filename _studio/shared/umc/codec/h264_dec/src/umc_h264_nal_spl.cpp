@@ -27,6 +27,7 @@
 #include "umc_decrypt.h"
 #include "umc_h264_nal_spl.h"
 #include "mfx_utils_logging.h"
+#include <log/log.h>
 
 namespace UMC
 {
@@ -70,6 +71,7 @@ public:
         m_code = -1;
         m_pts = -1;
         m_prev.clear();
+        m_prevSubsamples.clear();
     }
 
     virtual int32_t Init(MediaData * pSource)
@@ -106,7 +108,10 @@ public:
             return -1;
 
         if (m_code == -1)
+        {
             m_prev.clear();
+            m_prevSubsamples.clear();
+        }
 
         uint8_t * source = (uint8_t *)pSource->GetDataPointer();
         size_t  size = pSource->GetDataSize();
@@ -126,14 +131,14 @@ public:
     virtual int32_t GetNALUnit(MediaData * pSource, NalUnit * pDst)
     {
         if (!pSource)
-            return EndOfStream(pDst);
+            return EndOfStream(pSource, pDst);
 
         int32_t iCode = GetNALUnitInternal(pSource, pDst);
         if (iCode == -1)
         {
             bool endOfStream = pSource && ((pSource->GetFlags() & UMC::MediaData::FLAG_VIDEO_DATA_END_OF_STREAM) != 0);
             if (endOfStream)
-                iCode = EndOfStream(pDst);
+                iCode = EndOfStream(pSource, pDst);
         }
 
         return iCode;
@@ -142,7 +147,10 @@ public:
     int32_t GetNALUnitInternal(MediaData * pSource, NalUnit * pDst)
     {
         if (m_code == -1)
+        {
             m_prev.clear();
+            m_prevSubsamples.clear();
+        }
 
         uint8_t * source = (uint8_t *)pSource->GetDataPointer();
         size_t  size = pSource->GetDataSize();
@@ -153,6 +161,7 @@ public:
         int32_t startCodeSize;
         const Ranges<const uint8_t*>& encryptedRanges = pSource->GetEncryptedRanges();
         int32_t iCodeNext = FindStartCodeInClearRanges(source, size, startCodeSize, encryptedRanges);
+        std::vector<SubsampleEntry> subsamples;
 
         if (m_prev.size())
         {
@@ -162,23 +171,30 @@ public:
                 if (m_prev.size() + sz >  m_suggestedSize)
                 {
                     m_prev.clear();
+                    m_prevSubsamples.clear();
                     sz = std::min(sz, m_suggestedSize);
                 }
-
+                ALOGE("Nana: %s %d", __FUNCTION__, __LINE__);
                 m_prev.insert(m_prev.end(), (uint8_t *)pSource->GetDataPointer(), (uint8_t *)pSource->GetDataPointer() + sz);
+                subsamples = GetCurrentSubsamples(pSource, (const uint8_t *)pSource->GetDataPointer(), (const uint8_t *)pSource->GetDataPointer() + sz);
+                m_prevSubsamples.insert(m_prevSubsamples.end(), subsamples.begin(), subsamples.end());
                 pSource->MoveDataPointer((int32_t)sz);
                 return -1;
             }
-
+ALOGE("Nana: %s %d", __FUNCTION__, __LINE__);
             source -= startCodeSize;
             m_prev.insert(m_prev.end(), (uint8_t *)pSource->GetDataPointer(), source);
+            ALOGE("Nana: start end： %p %p", (uint8_t *)pSource->GetDataPointer(), source);
+            subsamples = GetCurrentSubsamples(pSource, (uint8_t *)pSource->GetDataPointer(), source);
+            m_prevSubsamples.insert(m_prevSubsamples.end(), subsamples.begin(), subsamples.end());
             pSource->MoveDataPointer((int32_t)(source - (uint8_t *)pSource->GetDataPointer()));
-
+ALOGE("Nana: %s %d", __FUNCTION__, __LINE__);
             pDst->m_use_external_memory = false;
             pDst->SetFlags(MediaData::FLAG_VIDEO_DATA_NOT_FULL_FRAME);
             pDst->SetBufferPointer(&(m_prev[0]), m_prev.size());
             pDst->SetDataSize(m_prev.size());
             pDst->SetTime(m_pts);
+            pDst->SetSubsamples(pSource, m_prevSubsamples);
             int32_t code = m_code;
             m_code = -1;
             m_pts = -1;
@@ -230,18 +246,31 @@ public:
             {
                 sz = m_suggestedSize;
             }
-
+ALOGE("Nana: %s %d", __FUNCTION__, __LINE__);
             m_prev.insert(m_prev.end(), (uint8_t *)pSource->GetDataPointer(), (uint8_t *)pSource->GetDataPointer() + sz);
+            ALOGE("Nana: start end： %p %p", (uint8_t *)pSource->GetDataPointer(), (uint8_t *)pSource->GetDataPointer() + sz);
+            subsamples = GetCurrentSubsamples(pSource, (const uint8_t *)pSource->GetDataPointer(), (const uint8_t *)pSource->GetDataPointer() + sz);
+                    ALOGE("Nana: subsamples.size(): %lu", subsamples.size());
+           for(auto entry:subsamples)
+            ALOGE("Nana: clear: %d cypher:%d", entry.clear_bytes, entry.cypher_bytes);
+            m_prevSubsamples.insert(m_prevSubsamples.end(), subsamples.begin(), subsamples.end());
             pSource->MoveDataPointer((int32_t)sz);
             return -1;
         }
 
         // fill
+        ALOGE("Nana: %s %d", __FUNCTION__, __LINE__);
         size_t nal_size = source - (uint8_t *)pSource->GetDataPointer() - startCodeSize1;
         pDst->SetBufferPointer((uint8_t*)pSource->GetDataPointer(), nal_size);
         pDst->SetDataSize(nal_size);
         pSource->MoveDataPointer((int32_t)nal_size);
         pDst->SetFlags(pSource->GetFlags());
+        ALOGE("Nana: start end： %p %p", (const uint8_t*)pDst->GetDataPointer(), (const uint8_t*)pDst->GetDataPointer() + pDst->GetDataSize());
+        subsamples = GetCurrentSubsamples(pSource, (const uint8_t*)pDst->GetDataPointer(), (const uint8_t*)pDst->GetDataPointer() + pDst->GetDataSize());
+        ALOGE("Nana: subsamples.size(): %lu", subsamples.size());
+        for(auto entry:subsamples)
+            ALOGE("Nana: clear: %d cypher:%d", entry.clear_bytes, entry.cypher_bytes);
+        pDst->SetSubsamples(pSource, subsamples);
 
         int32_t code = m_code;
         m_code = -1;
@@ -251,11 +280,12 @@ public:
         return code;
     }
 
-    int32_t EndOfStream(NalUnit * pDst)
+    int32_t EndOfStream(MediaData * pSource, NalUnit * pDst)
     {
         if (m_code == -1)
         {
             m_prev.clear();
+            m_prevSubsamples.clear();
             return -1;
         }
 
@@ -264,6 +294,7 @@ public:
             pDst->SetBufferPointer(&(m_prev[0]), m_prev.size());
             pDst->SetDataSize(m_prev.size());
             pDst->SetTime(m_pts);
+            pDst->SetSubsamples(pSource, m_prevSubsamples);
             pDst->m_use_external_memory = false;
             int32_t code = m_code;
             m_code = -1;
@@ -277,6 +308,7 @@ public:
 
 private:
     std::vector<uint8_t>  m_prev;
+    std::vector<SubsampleEntry> m_prevSubsamples;
     int32_t   m_code;
     double   m_pts;
 
@@ -430,16 +462,13 @@ public:
     }
 };
 
-void NalUnit::GetCurrentSubsamples(MediaData *pSource)
-{
+void NalUnit::SetSubsamples(MediaData *pSource, const std::vector<SubsampleEntry>& subsamples) {
     MediaData::AuxInfo* aux = (pSource) ? pSource->GetAuxInfo(MFX_EXTBUFF_DECRYPT_CONFIG) : NULL;
     m_decryptConfig = (aux) ? reinterpret_cast<mfxExtDecryptConfig*>(aux->ptr) : NULL;
-
-    Ranges<const uint8_t*> naluRange;
-    Ranges<const uint8_t*> encryptedRanges = pSource->GetEncryptedRanges();
-    naluRange.Add((const uint8_t*)GetDataPointer(), (const uint8_t*)GetDataPointer() + GetDataSize());
-    auto intersection = encryptedRanges.IntersectionWith(naluRange);
-    m_subsamples =  EncryptedRangesToSubsampleEntry(naluRange.start(0), naluRange.end(0), intersection);
+    m_subsamples = subsamples;
+    for(auto& entry: subsamples) {
+        ALOGE("Nana: clear: %d cypher: %d", entry.clear_bytes, entry.cypher_bytes);
+    }
 }
 
 NALUnitSplitter::NALUnitSplitter()
@@ -498,7 +527,6 @@ NalUnit * NALUnitSplitter::GetNalUnits(MediaData * pSource)
         return 0;
     }
 
-    m_nalUnit.GetCurrentSubsamples(pSource);
     m_nalUnit.m_nal_unit_type = iCode;
 
     /*static int k = 0;
