@@ -2456,6 +2456,7 @@ enum {
     MFX_EXTBUFF_ALPHA_CHANNEL_SURFACE = MFX_MAKEFOURCC('A', 'C', 'S', 'F'),
 
     MFX_EXTBUFF_DECRYPT_CONFIG          = MFX_MAKEFOURCC('D', 'E', 'C', 'R'),
+    MFX_EXTBUFF_SECURE_CODEC            = MFX_MAKEFOURCC('S', 'E', 'C', 'U'),
 };
 
 /* VPP Conf: Do not use certain algorithms  */
@@ -5342,6 +5343,11 @@ typedef struct {
     mfxU32 num_subsamples;
     SubsampleEntry *subsamples;
 } mfxExtDecryptConfig;
+
+typedef struct {
+    mfxExtBuffer Header;
+    mfxU8 on;
+} mfxExtSecureCodec;
 
 #ifdef __cplusplus
 } // extern "C"
