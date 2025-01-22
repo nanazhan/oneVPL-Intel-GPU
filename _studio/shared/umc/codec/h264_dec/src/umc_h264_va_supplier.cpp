@@ -38,6 +38,7 @@
 #include "mfx_common_int.h"
 #include "mfx_ext_buffers.h"
 #include "umc_h264_notify.h"
+#include <log/log.h>
 
 namespace UMC
 {
@@ -223,10 +224,12 @@ H264DecoderFrame *VATaskSupplier::GetFreeFrame(const H264Slice * pSlice)
     {
         if (view.GetDPBList(0)->countAllFrames() >= view.maxDecFrameBuffering + m_DPBSizeEx)
         {
+            ALOGE("Nana: %s %d  %lu", __FUNCTION__, __LINE__);
             DEBUG_PRINT((VM_STRING("Fail to find disposable frame\n")));
             return 0;
         }
 
+ALOGE("Nana: %s %d  %lu", __FUNCTION__, __LINE__);
         // Didn't find one. Let's try to insert a new one
         pFrame = new H264DecoderFrame(m_pMemoryAllocator, &m_ObjHeap);
         if (NULL == pFrame)
@@ -235,11 +238,10 @@ H264DecoderFrame *VATaskSupplier::GetFreeFrame(const H264Slice * pSlice)
         view.GetDPBList(0)->append(pFrame);
     }
 
-    DEBUG_PRINT((VM_STRING("Cleanup frame POC - %d, %d, field - %d, uid - %d, frame_num - %d, viewId - %d\n"),
+    ALOGE("Cleanup frame POC - %d, %d, field - %d, uid - %d, frame_num - %d, viewId - %d",
         pFrame->m_PicOrderCnt[0], pFrame->m_PicOrderCnt[1],
         pFrame->GetNumberByParity(pSlice->GetSliceHeader()->bottom_field_flag),
-        pFrame->m_UID, pFrame->m_FrameNum, pFrame->m_viewId)
-    );
+        pFrame->m_UID, pFrame->m_FrameNum, pFrame->m_viewId);
 
     DecReferencePictureMarking::Remove(pFrame);
     pFrame->Reset();

@@ -38,7 +38,7 @@
 #include "umc_h264_notify.h"
 
 #include "umc_h264_dec_debug.h"
-
+#include <log/log.h>
 using namespace UMC_H264_DECODER;
 
 namespace UMC
@@ -3154,6 +3154,7 @@ Status TaskSupplier::AddSource(MediaData * pSource)
 
     if (UMC_ERR_NOT_ENOUGH_BUFFER == umcRes)
     {
+        ALOGE("Nana: %s %d", __FUNCTION__, __LINE__);
         ViewItem &view = GetView(m_currentView);
         H264DBPList *pDPB = view.GetDPBList(0);
 
@@ -3276,22 +3277,24 @@ Status TaskSupplier::AddOneFrame(MediaData * pSource)
         mfxExtDecodeErrorReport* pDecodeErrorReport = (aux) ? reinterpret_cast<mfxExtDecodeErrorReport*>(aux->ptr) : NULL;
 
         NalUnit *nalUnit = m_pNALSplitter->GetNalUnits(pSource);
-
+        ALOGE("Nana: %s %d", __FUNCTION__, __LINE__);
         if (!nalUnit && pSource)
         {
             uint32_t flags = pSource->GetFlags();
-
+            ALOGE("Nana: flag: %u", flags);
             if (!(flags & MediaData::FLAG_VIDEO_DATA_NOT_FULL_FRAME))
             {
+                ALOGE("Nana: %s %d", __FUNCTION__, __LINE__);
                 assert(!m_pLastSlice);
                 return AddSlice(0, true);
             }
-
+            ALOGE("Nana: %s %d", __FUNCTION__, __LINE__);
             return UMC_ERR_SYNC;
         }
 
         if (!nalUnit)
         {
+            ALOGE("Nana: %s %d", __FUNCTION__, __LINE__);
             if (!pSource)
                 return AddSlice(0, true);
         }
@@ -3310,13 +3313,14 @@ Status TaskSupplier::AddOneFrame(MediaData * pSource)
         case NAL_UT_AUXILIARY:
         case NAL_UT_CODED_SLICE_EXTENSION:
             {
+            ALOGE("Nana: %s %d %d", __FUNCTION__, __LINE__, (NAL_Unit_Type)nalUnit->GetNalUnitType());
             H264Slice * pSlice = DecodeSliceHeader(nalUnit);
             if (pSlice)
             {
                 umsRes = AddSlice(pSlice, !pSource);
                 if (umsRes == UMC_ERR_NOT_ENOUGH_BUFFER || umsRes == UMC_OK || umsRes == UMC_ERR_ALLOC)
                 {
-
+                    ALOGE("Nana: %s %d", __FUNCTION__, __LINE__);
                     return umsRes;
                 }
             }
@@ -3328,6 +3332,7 @@ Status TaskSupplier::AddOneFrame(MediaData * pSource)
         case NAL_UT_SPS_EX:
         case NAL_UT_SUBSET_SPS:
         case NAL_UT_PREFIX:
+        ALOGE("Nana: %s %d %d", __FUNCTION__, __LINE__, (NAL_Unit_Type)nalUnit->GetNalUnitType());
             umsRes = DecodeHeaders(nalUnit);
             if (umsRes != UMC_OK)
             {
@@ -3350,16 +3355,19 @@ Status TaskSupplier::AddOneFrame(MediaData * pSource)
             break;
 
         case NAL_UT_SEI:
+        ALOGE("Nana: %s %d %d", __FUNCTION__, __LINE__, (NAL_Unit_Type)nalUnit->GetNalUnitType());
             m_accessUnit.CompleteLastLayer();
             DecodeSEI(nalUnit);
             break;
         case NAL_UT_AUD:  //ignore it
+        ALOGE("Nana: %s %d %d", __FUNCTION__, __LINE__, (NAL_Unit_Type)nalUnit->GetNalUnitType());
             m_accessUnit.CompleteLastLayer();
             break;
 
         case NAL_UT_END_OF_STREAM:
         case NAL_UT_END_OF_SEQ:
             {
+                ALOGE("Nana: %s %d %d", __FUNCTION__, __LINE__, (NAL_Unit_Type)nalUnit->GetNalUnitType());
                 m_accessUnit.CompleteLastLayer();
                 m_WaitForIDR = true;
             }
@@ -3377,18 +3385,21 @@ Status TaskSupplier::AddOneFrame(MediaData * pSource)
 
     if (!pSource)
     {
+        ALOGE("Nana: %s %d ", __FUNCTION__, __LINE__);
         return AddSlice(0, true);
     }
     else
     {
         uint32_t flags = pSource->GetFlags();
-
+ALOGE("Nana: flag: %u", flags);
         if (!(flags & MediaData::FLAG_VIDEO_DATA_NOT_FULL_FRAME))
         {
+            ALOGE("Nana: %s %d ", __FUNCTION__, __LINE__);
             assert(!m_pLastSlice);
             return AddSlice(0, true);
         }
     }
+    ALOGE("Nana: %s %d ", __FUNCTION__, __LINE__);
 
     return UMC_ERR_NOT_ENOUGH_DATA;
 }
@@ -3614,14 +3625,17 @@ Status TaskSupplier::AddSlice(H264Slice * pSlice, bool force)
 
     if (!pSlice)
     {
+        ALOGE("Nana: %s %d", __FUNCTION__, __LINE__);
         m_accessUnit.AddSlice(0); // full AU
     }
 
+    ALOGE("Nana: %s %d  %lu", __FUNCTION__, __LINE__,  m_accessUnit.GetLayersCount());
     if ((!pSlice || m_accessUnit.IsFullAU() || !m_accessUnit.AddSlice(pSlice)) && m_accessUnit.GetLayersCount())
     {
         m_pLastSlice = pSlice;
         if (!m_accessUnit.m_isInitialized)
         {
+            ALOGE("Nana: %s %d", __FUNCTION__, __LINE__);
             InitializeLayers(&m_accessUnit, 0, 0);
 
             size_t layersCount = m_accessUnit.GetLayersCount();
@@ -3672,17 +3686,18 @@ Status TaskSupplier::AddSlice(H264Slice * pSlice, bool force)
             {
                 SetOfSlices * setOfSlices = m_accessUnit.GetLayer(i);
                 H264Slice * slice = setOfSlices->GetSlice(0);
-
+ALOGE("Nana: %s %d ", __FUNCTION__, __LINE__);
                 if (setOfSlices->m_frame)
                     continue;
-
+ALOGE("Nana: %s %d ", __FUNCTION__, __LINE__);
                 Status sts = AllocateNewFrame(slice, &setOfSlices->m_frame);
                 if (sts != UMC_OK)
                     return sts;
 
-                if (!setOfSlices->m_frame)
+                if (!setOfSlices->m_frame) {
+                    ALOGE("Nana: %s %d", __FUNCTION__, __LINE__);
                     return UMC_ERR_NOT_ENOUGH_BUFFER;
-
+                }
                 setOfSlices->m_frame->m_auIndex = m_accessUnit.GetAUIndentifier();
                 ApplyPayloadsToFrame(setOfSlices->m_frame, slice, &setOfSlices->m_payloads);
 
@@ -3786,10 +3801,12 @@ Status TaskSupplier::AddSlice(H264Slice * pSlice, bool force)
             setOfSlices->m_isCompleted = true;
         }
 
+        ALOGE("Nana: %s %d %lu", __FUNCTION__, __LINE__, layersCount);
         m_accessUnit.Reset();
         return layersCount ? UMC_OK : UMC_ERR_NOT_ENOUGH_DATA;
     }
 
+ALOGE("Nana: %s %d ", __FUNCTION__, __LINE__);
     m_pLastSlice = 0;
     return UMC_ERR_NOT_ENOUGH_DATA;
 }
@@ -4269,17 +4286,20 @@ Status TaskSupplier::AllocateNewFrame(const H264Slice *slice, H264DecoderFrame *
     H264DecoderFrame *pFrame = GetFreeFrame(slice);
     if (!pFrame)
     {
+        ALOGE("Nana: %s %d", __FUNCTION__, __LINE__);
         return UMC_ERR_NOT_ENOUGH_BUFFER;
     }
 
     Status umcRes = AllocateFrameData(pFrame);
     if (umcRes != UMC_OK)
     {
+        ALOGE("Nana: %s %d", __FUNCTION__, __LINE__);
         return umcRes;
     }
 
     *frame = pFrame;
 
+    ALOGE("Nana: %s %d", __FUNCTION__, __LINE__);
     if (slice->IsField())
     {
         pFrame->GetAU(1)->SetStatus(H264DecoderFrameInfo::STATUS_NOT_FILLED);

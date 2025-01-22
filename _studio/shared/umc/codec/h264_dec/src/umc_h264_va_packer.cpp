@@ -33,7 +33,7 @@
 #if defined (MFX_EXTBUFF_GPU_HANG_ENABLE)
 #include "vaapi_ext_interface.h"
 #endif
-
+#include <log/log.h>
 #include "mfx_trace.h"
 
 #include "mfx_unified_h264d_logging.h"
@@ -736,6 +736,7 @@ void PackerVA::SetupDecryptDecode(H264Slice *pSlice, VAEncryptionParameters* cry
 
     for (const auto& entry : subsamples)
     {
+        ALOGE("Nana: xx1111dd: clear: %d cypher: %d", entry.clear_bytes, entry.cypher_bytes);
         VAEncryptionSegmentInfo segment_info = {};
         segment_info.segment_start_offset = offset;
         segment_info.segment_length = entry.clear_bytes + entry.cypher_bytes;
@@ -877,7 +878,7 @@ void PackerVA::PackAU(const H264DecoderFrame *pFrame, int32_t isTop)
     PackQmatrix(scaling);
 
     int32_t chopping = CHOPPING_NONE;
-
+    ALOGE("Nana: PackAU: %u", count_all);
     for ( ; first_slice < count_all; )
     {
         encryption_segment_info_.clear();
@@ -890,6 +891,7 @@ void PackerVA::PackAU(const H264DecoderFrame *pFrame, int32_t isTop)
         uint32_t n = 0, count = 0;
         for (; n < count_all; ++n)
         {
+            ALOGE("Nana:111111111111: %u", n);
             // put slice header
             H264Slice *pSlice = sliceInfo->GetSlice(first_slice + n);
             chopping = PackSliceParams(pSlice, n, chopping, 0 /* ignored */);
@@ -903,7 +905,7 @@ void PackerVA::PackAU(const H264DecoderFrame *pFrame, int32_t isTop)
         }
 
         first_slice += n;
-
+    ALOGE("Nana: PackAU: 111111111111111 %u", count_all);
         UMCVACompBuffer *sliceParamBuf;
         m_va->GetCompBuffer(VASliceParameterBufferType, &sliceParamBuf);
         if (!sliceParamBuf)

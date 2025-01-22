@@ -22,7 +22,7 @@
 #if defined (MFX_ENABLE_H264_VIDEO_DECODE)
 
 #include <memory>
-
+#include <log/log.h>
 #include "umc_h264_au_splitter.h"
 #include "umc_h264_nal_spl.h"
 
@@ -411,6 +411,7 @@ bool AccessUnit::AddSlice(H264Slice * slice)
     }
 
     SetOfSlices * setOfSlices = GetLayerBySlice(slice);
+    ALOGE("Nana: %s %d", __FUNCTION__, __LINE__);
     if (!setOfSlices)
     {
         if (!m_layers.empty())
@@ -418,6 +419,7 @@ bool AccessUnit::AddSlice(H264Slice * slice)
             SetOfSlices * lastSetOfSlices = GetLastLayer();
             if (lastSetOfSlices->GetSlice(0)->GetSliceHeader()->nal_ext.svc.dependency_id > slice->GetSliceHeader()->nal_ext.svc.dependency_id)
             {
+                ALOGE("Nana: %s %d", __FUNCTION__, __LINE__);
                 m_isFullAU = true;
                 return false;
             }
@@ -430,10 +432,12 @@ bool AccessUnit::AddSlice(H264Slice * slice)
     H264Slice * lastSlice = setOfSlices->GetSlice(setOfSlices->GetSliceCount() - 1);
     if (!IsPictureTheSame(lastSlice, slice) || setOfSlices->m_isFull)
     {
+        ALOGE("Nana: %s %d", __FUNCTION__, __LINE__);
         m_isFullAU = true;
         return false;
     }
 
+    ALOGE("Nana: %s %d", __FUNCTION__, __LINE__);
     m_payloads.Release();
 
     setOfSlices->AddSlice(slice);
