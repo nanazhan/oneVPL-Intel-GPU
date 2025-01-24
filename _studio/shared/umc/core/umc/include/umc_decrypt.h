@@ -57,10 +57,11 @@ union pavp_42_header_stream_t {
 };
 
 constexpr uint32_t FIRMWARE_API_VERSION_2_1 = ((2 << 16) | (1));
+constexpr uint32_t FIRMWARE_API_VERSION_2_4 = ((2 << 16) | (4));
 constexpr uint32_t FIRMWARE_API_VERSION_4_2 = ((4 << 16) | (2));
 
 struct pavp_cmd_header_t {
-    uint32_t api_version = FIRMWARE_API_VERSION_2_1;
+    uint32_t api_version = FIRMWARE_API_VERSION_2_4; // TODO: check android version
     uint32_t command_id;
     union {
         uint32_t status;
