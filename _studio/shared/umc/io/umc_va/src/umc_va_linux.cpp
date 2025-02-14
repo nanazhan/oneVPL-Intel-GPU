@@ -28,6 +28,7 @@
 #include "umc_frame_allocator.h"
 #include "mfxstructures.h"
 #include "va_protected_content_private.h"
+#include <log/log.h>
 
 #define UMC_VA_NUM_OF_COMP_BUFFERS       8
 #define UMC_VA_DECODE_STREAM_OUT_ENABLE  2
@@ -559,6 +560,7 @@ Status LinuxVideoAccelerator::Init(VideoAcceleratorParams* pInfo)
                                     VA_PC_SESSION_TYPE_DISPLAY, VAEntrypointProtectedContent, EncryptionScheme::kCenc);
             umcRes = AttachProtectedSession();
             m_last_used_encryption_scheme = EncryptionScheme::kCenc;
+            ALOGE("Nana: Init: %d", m_last_used_encryption_scheme);
         }
     }
     return umcRes;
@@ -675,6 +677,7 @@ VAProtectedSessionID LinuxVideoAccelerator::CreateProtectedSession(uint32_t sess
     if (va_status != VA_STATUS_SUCCESS)
         MFX_TRACE_1("vaDestroyConfig: ", "%d", va_status);
 
+    ALOGE("Nana: 111111");
     MFX_CHECK(VA_STATUS_SUCCESS == va_status, VA_INVALID_ID);
     return session;
 }
@@ -686,6 +689,12 @@ Status LinuxVideoAccelerator::DestroyProtectedSession(VAProtectedSessionID sessi
         return UMC_ERR_NOT_INITIALIZED;
 
     VAStatus va_res = vaDestroyProtectedSession(m_dpy, session_id);
+    if (va_res != VA_STATUS_SUCCESS) {
+        ALOGE("Nana: destroyProtectedSession error");
+    }
+    else{
+        ALOGE("Nana: destroyProtectedSession succ");
+    }
     return va_to_umc_res(va_res);
 }
 
@@ -697,6 +706,12 @@ Status LinuxVideoAccelerator::AttachProtectedSession()
         return UMC_ERR_NOT_INITIALIZED;
 
     VAStatus va_res = vaAttachProtectedSession(m_dpy, *m_pContext, m_protectedSessionID);
+    if (va_res != VA_STATUS_SUCCESS) {
+        ALOGE("Nana: AttachProtectedSession error");
+    }
+    else{
+        ALOGE("Nana: AttachProtectedSession succ");
+    }
     return va_to_umc_res(va_res);
 }
 
@@ -706,6 +721,13 @@ Status LinuxVideoAccelerator::DetachProtectedSession()
     Status umcRes = UMC_OK;
 
     VAStatus va_res = vaDetachProtectedSession(m_dpy, *m_pContext);
+    
+    if (va_res != VA_STATUS_SUCCESS) {
+        ALOGE("Nana: DetachProtectedSession error");
+    }
+    else{
+        ALOGE("Nana: DetachProtectedSession succ");
+    }
     umcRes = va_to_umc_res(va_res);
     return umcRes;
 }
@@ -854,8 +876,10 @@ bool LinuxVideoAccelerator::SetStreamKey()
 
 bool LinuxVideoAccelerator::ConfigHwKey(const mfxExtDecryptConfig& decryptConfig, VAEncryptionParameters* pEncryptionParam)
 {
+    ALOGE("Nana: %d %d", m_last_used_encryption_scheme, decryptConfig.encryption_scheme);
     if (m_last_used_encryption_scheme != decryptConfig.encryption_scheme)
     {
+        ALOGE("Nana: xxxxxxxxxx");
         DetachProtectedSession();
         DestroyProtectedSession(m_protectedSessionID);
         m_protectedSessionID = CreateProtectedSession(VA_PC_SESSION_MODE_HEAVY,
