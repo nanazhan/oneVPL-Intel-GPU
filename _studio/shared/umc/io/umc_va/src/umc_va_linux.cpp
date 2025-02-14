@@ -528,8 +528,8 @@ Status LinuxVideoAccelerator::Init(VideoAcceleratorParams* pInfo)
             {
                 if (va_attributes[i].type == VAConfigAttribEncryption)
                 {
-                    MFX_LTRACE_MSG(MFX_TRACE_LEVEL_EXTCALL, "set VAConfigAttribEncryption = VA_ENCRYPTION_TYPE_SUBSAMPLE_CBC");
-                    va_attributes[i].value = VA_ENCRYPTION_TYPE_SUBSAMPLE_CBC;
+                    MFX_LTRACE_MSG(MFX_TRACE_LEVEL_EXTCALL, "set VAConfigAttribEncryption = VA_ENCRYPTION_TYPE_SUBSAMPLE_CTR");
+                    va_attributes[i].value = VA_ENCRYPTION_TYPE_SUBSAMPLE_CTR;
                 }
             }
         }
@@ -573,8 +573,9 @@ Status LinuxVideoAccelerator::Init(VideoAcceleratorParams* pInfo)
         if (m_secure)
         {
             m_protectedSessionID = CreateProtectedSession(VA_PC_SESSION_MODE_HEAVY,
-                                    VA_PC_SESSION_TYPE_DISPLAY, VAEntrypointProtectedContent, EncryptionScheme::kCbcs);
-            umcRes = AttachProtectedSession(m_protectedSessionID);
+                                    VA_PC_SESSION_TYPE_DISPLAY, VAEntrypointProtectedContent, EncryptionScheme::kCenc);
+            umcRes = AttachProtectedSession();
+            m_last_used_encryption_scheme = EncryptionScheme::kCenc;
         }
     }
     return umcRes;
@@ -682,7 +683,10 @@ VAProtectedSessionID LinuxVideoAccelerator::CreateProtectedSession(uint32_t sess
     VAProtectedSessionID session = VA_INVALID_ID;
     va_status = vaCreateProtectedSession(m_dpy, config_id, &session);
     if (va_status != VA_STATUS_SUCCESS)
+    {
+        vaDestroyConfig(m_dpy, config_id);
         return VA_INVALID_ID;
+    }
 
     va_status = vaDestroyConfig(m_dpy, config_id);
     if (va_status != VA_STATUS_SUCCESS)
@@ -692,19 +696,34 @@ VAProtectedSessionID LinuxVideoAccelerator::CreateProtectedSession(uint32_t sess
     return session;
 }
 
-Status LinuxVideoAccelerator::AttachProtectedSession(VAProtectedSessionID session_id)
+Status LinuxVideoAccelerator::DestroyProtectedSession(VAProtectedSessionID session_id)
 {
-    MFX_AUTO_LTRACE(MFX_TRACE_LEVEL_EXTCALL, "AttachProtectedSession");
+    MFX_AUTO_LTRACE(MFX_TRACE_LEVEL_HOTSPOTS, "LinuxVideoAccelerator::DestroyProtectedSession");
+    if (session_id == VA_INVALID_ID)
+        return UMC_ERR_NOT_INITIALIZED;
+
+    VAStatus va_res = vaDestroyProtectedSession(m_dpy, session_id);
+    return va_to_umc_res(va_res);
+}
+
+Status LinuxVideoAccelerator::AttachProtectedSession()
+{
+    MFX_AUTO_LTRACE(MFX_TRACE_LEVEL_EXTCALL, "LinuxVideoAccelerator::AttachProtectedSession");
+
+    if (m_protectedSessionID == VA_INVALID_ID)
+        return UMC_ERR_NOT_INITIALIZED;
+
+    VAStatus va_res = vaAttachProtectedSession(m_dpy, *m_pContext, m_protectedSessionID);
+    return va_to_umc_res(va_res);
+}
+
+Status LinuxVideoAccelerator::DetachProtectedSession()
+{
+    MFX_AUTO_LTRACE(MFX_TRACE_LEVEL_EXTCALL, "LinuxVideoAccelerator::DetachProtectedSession");
     Status umcRes = UMC_OK;
 
-    if (session_id <= 0)
-        umcRes = UMC_ERR_NOT_INITIALIZED;
-
-    if (UMC_OK == umcRes) {
-        auto va_res = vaAttachProtectedSession(m_dpy, *m_pContext, session_id);
-        umcRes = va_to_umc_res(va_res);
-    }
-
+    VAStatus va_res = vaDetachProtectedSession(m_dpy, *m_pContext);
+    umcRes = va_to_umc_res(va_res);
     return umcRes;
 }
 
@@ -850,13 +869,15 @@ bool LinuxVideoAccelerator::SetStreamKey()
     return true;
 }
 
-bool LinuxVideoAccelerator::DecryptCTR(const mfxExtDecryptConfig& decryptConfig, VAEncryptionParameters* pEncryptionParam)
+bool LinuxVideoAccelerator::ConfigHwKey(const mfxExtDecryptConfig& decryptConfig, VAEncryptionParameters* pEncryptionParam)
 {
-    if (VA_INVALID_ID == m_protectedSessionID)
+    if (m_last_used_encryption_scheme != decryptConfig.encryption_scheme)
     {
+        DetachProtectedSession();
+        DestroyProtectedSession(m_protectedSessionID);
         m_protectedSessionID = CreateProtectedSession(VA_PC_SESSION_MODE_HEAVY,
                                 VA_PC_SESSION_TYPE_DISPLAY, VAEntrypointProtectedContent, decryptConfig.encryption_scheme);
-        Status umcRes = AttachProtectedSession(m_protectedSessionID);
+        Status umcRes = AttachProtectedSession();
         if (UMC_OK != umcRes) {
             MFX_LTRACE_MSG(MFX_TRACE_LEVEL_EXTCALL, "AttachProtectedSession failed!");
             MFX_TRACE_I(umcRes);
@@ -864,6 +885,7 @@ bool LinuxVideoAccelerator::DecryptCTR(const mfxExtDecryptConfig& decryptConfig,
         }
     }
 
+    m_last_used_encryption_scheme = decryptConfig.encryption_scheme;
     m_key_session = decryptConfig.session;
     std::vector<uint8_t> hw_key_id(decryptConfig.hw_key_id, decryptConfig.hw_key_id + kDecryptionKeySize);
     if (m_selectKey != hw_key_id)
@@ -917,6 +939,20 @@ Status LinuxVideoAccelerator::Close(void)
     }
     if (NULL != m_dpy)
     {
+        if (m_heci_sessionID != VA_INVALID_ID)
+        {
+            VAStatus vaSts = DestroyProtectedSession(m_heci_sessionID);
+            std::ignore = MFX_STS_TRACE(vaSts);
+            m_heci_sessionID = VA_INVALID_ID;
+        }
+        if (m_protectedSessionID != VA_INVALID_ID)
+        {
+            VAStatus vaSts = DetachProtectedSession();
+            std::ignore = MFX_STS_TRACE(vaSts);
+            vaSts = DestroyProtectedSession(m_protectedSessionID);
+            std::ignore = MFX_STS_TRACE(vaSts);
+            m_protectedSessionID = VA_INVALID_ID;
+        }
         if ((m_pContext && (*m_pContext != VA_INVALID_ID)) && !(m_pKeepVAState && *m_pKeepVAState))
         {
             MFX_AUTO_LTRACE(MFX_TRACE_LEVEL_EXTCALL, "vaDestroyContext");
