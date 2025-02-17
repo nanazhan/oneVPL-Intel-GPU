@@ -210,6 +210,32 @@ public:
 
     uint32_t getTileXIdx() const;
     uint32_t getTileYIdx() const;
+
+public:
+    const mfxExtDecryptConfig& GetDecryptConfig(void) const {return m_decryptConfig;}
+    void SetDecryptConfig(mfxExtDecryptConfig* decryptConfig) {
+        if (decryptConfig)
+        {
+            m_decryptConfig.encryption_scheme = decryptConfig->encryption_scheme;
+            std::memcpy(m_decryptConfig.hw_key_id, decryptConfig->hw_key_id, 16);
+            std::memcpy(m_decryptConfig.iv, decryptConfig->iv, 16);
+            m_decryptConfig.session = decryptConfig->session;
+            m_decryptConfig.pattern.cypher_byte_block = decryptConfig->pattern.cypher_byte_block;
+            m_decryptConfig.pattern.clear_byte_block = decryptConfig->pattern.clear_byte_block;
+        }
+        else
+        {
+            memset(&m_decryptConfig, 0, sizeof(m_decryptConfig));
+        }
+
+    }
+    const std::vector<SubsampleEntry>& GetSubsamples() const {return m_subsamples;}
+    void SetSubsamples(const std::vector<SubsampleEntry>& subsamples) {m_subsamples = subsamples;}
+
+
+private:
+    mfxExtDecryptConfig          m_decryptConfig;
+    std::vector<SubsampleEntry>  m_subsamples;
 };
 
 // Check whether two slices are from the same picture. HEVC spec 7.4.2.4.5

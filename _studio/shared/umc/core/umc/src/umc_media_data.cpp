@@ -18,6 +18,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+#include "umc_decrypt.h"
 #include "umc_media_data.h"
 #include "umc_defs.h"
 
@@ -287,5 +288,17 @@ Status MediaData::MoveDataTo(MediaData* dst)
     return UMC_OK;
 
 } // MediaData::MoveDataTo(MediaData& src)
+
+void MediaData::GetCurrentSubsamples(MediaData *pSource)
+{
+    MediaData::AuxInfo* aux = (pSource) ? pSource->GetAuxInfo(MFX_EXTBUFF_DECRYPT_CONFIG) : NULL;
+    m_decryptConfig = (aux) ? reinterpret_cast<mfxExtDecryptConfig*>(aux->ptr) : NULL;
+
+    Ranges<const uint8_t*> naluRange;
+    Ranges<const uint8_t*> encryptedRanges = pSource->GetEncryptedRanges();
+    naluRange.Add((const uint8_t*)GetDataPointer(), (const uint8_t*)GetDataPointer() + GetDataSize());
+    auto intersection = encryptedRanges.IntersectionWith(naluRange);
+    m_subsamples =  EncryptedRangesToSubsampleEntry(naluRange.start(0), naluRange.end(0), intersection);
+}
 
 } // namespace UMC

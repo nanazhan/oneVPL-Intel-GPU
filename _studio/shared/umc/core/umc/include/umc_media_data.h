@@ -24,6 +24,7 @@
 #include "umc_ranges.h"
 #include "umc_structures.h"
 #include "umc_dynamic_cast.h"
+#include "mfxstructures.h"
 
 #include <list>
 
@@ -108,6 +109,10 @@ public:
     void SetEncryptedRanges(Ranges<const uint8_t*> ranges) { m_encryptedRanges = std::move(ranges); }
     const Ranges<const uint8_t*>& GetEncryptedRanges(void) const { return m_encryptedRanges; }
 
+    void GetCurrentSubsamples(MediaData *pSource);
+    mfxExtDecryptConfig* DecryptConfig() { return m_decryptConfig; }
+    std::vector<SubsampleEntry> Subsamples() { return m_subsamples; }
+
     AuxInfo* GetAuxInfo(int type)
     {
         return
@@ -159,7 +164,10 @@ protected:
 
     std::list<AuxInfo> m_AuxInfo;
 
+private:
     Ranges<const uint8_t*> m_encryptedRanges;
+    mfxExtDecryptConfig *m_decryptConfig = NULL;
+    std::vector<SubsampleEntry> m_subsamples;
 };
 
 
