@@ -213,7 +213,8 @@ public:
 
 public:
     const mfxExtDecryptConfig& GetDecryptConfig(void) const {return m_decryptConfig;}
-    void SetDecryptConfig(mfxExtDecryptConfig* decryptConfig) {
+    void SetDecryptConfig(mfxExtDecryptConfig* decryptConfig)
+    {
         if (decryptConfig)
         {
             m_decryptConfig.encryption_scheme = decryptConfig->encryption_scheme;
@@ -231,6 +232,13 @@ public:
     }
     const std::vector<SubsampleEntry>& GetSubsamples() const {return m_subsamples;}
     void SetSubsamples(const std::vector<SubsampleEntry>& subsamples) {m_subsamples = subsamples;}
+    void UpdateSubsamples(mfxU32 header_size)
+    {
+        if (!m_subsamples.empty())
+        {
+            m_subsamples[0].clear_bytes += header_size;
+        }
+    }
 
 
 private:

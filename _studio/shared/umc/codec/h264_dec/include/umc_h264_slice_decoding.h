@@ -242,7 +242,8 @@ public:  // DEBUG !!!! should remove dependence
 
 public:
     const mfxExtDecryptConfig& GetDecryptConfig(void) {return m_decryptConfig;}
-    void SetDecryptConfig(mfxExtDecryptConfig* decryptConfig) {
+    void SetDecryptConfig(mfxExtDecryptConfig* decryptConfig)
+    {
         if (decryptConfig)
         {
             m_decryptConfig.encryption_scheme = decryptConfig->encryption_scheme;

@@ -502,7 +502,7 @@ namespace UMC_HEVC_DECODER
                 sp_base->slice_data_size   = size + sizeof(start_code);
                 sp_base->slice_data_offset = offset;
                 sp_base->slice_data_flag   = VA_SLICE_DATA_FLAG_ALL;
-
+                const_cast<H265Slice*>(slice)->UpdateSubsamples(sizeof(start_code));
             }
         };
     } //G9
