@@ -519,8 +519,9 @@ Status LinuxVideoAccelerator::Init(VideoAcceleratorParams* pInfo)
             umcRes = va_to_umc_res(va_res);
         }
 
-        int32_t attribsNumber = 4;
-        // int32_t attribsNumber = 2;
+        int32_t attribsNumber = 2;
+        if (m_secure)
+            attribsNumber = 4;
         if (UMC_OK == umcRes)
         {
             umcRes = SetAttributes(va_profile, pParams, va_attributes, &attribsNumber);
